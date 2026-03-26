@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nassau County Girls Lacrosse 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Firebase SDKs (required for live real-time sync) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+:root{
+  --navy:#0a1628;--navy2:#112240;--navy3:#0d1e38;
+  --blue:#1a56db;--blue-lt:#3b82f6;
+  --gold:#f59e0b;--gold-lt:#fcd34d;
+  --green:#10b981;--red:#ef4444;--orange:#f97316;
+  --gray:#94a3b8;--border:#1e3a5f;
+  --card:#112240;--card2:#0f1f3d;
+  --text:#e2e8f0;--text-dim:#94a3b8;
+  --c1:#f59e0b;--c2:#3b82f6;--c3:#10b981;--c4:#a855f7;--c5:#ec4899;--c6:#06b6d4;
+  --cA:#ef4444;--cB:#f97316;--cC:#eab308;--cD:#22c55e;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Barlow',sans-serif;background:var(--navy);color:var(--text);min-height:100vh}
+header{background:linear-gradient(135deg,#0a1628,#112240 60%,#0a1e3d);border-bottom:3px solid var(--gold);padding:14px 20px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100}
+.logo{width:46px;height:46px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:17px;color:var(--navy);flex-shrink:0}
+header h1{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:23px;letter-spacing:1px;text-transform:uppercase;line-height:1.1}
+header h1 .sub{color:var(--gold);display:block;font-size:11px;font-weight:600;letter-spacing:3px}
+.hright{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.upill{display:flex;align-items:center;gap:6px;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3);border-radius:20px;padding:5px 11px;font-size:12px;font-weight:600;color:var(--gold)}
+.blink{background:none;border:none;cursor:pointer;font-family:'Barlow',sans-serif;font-size:12px;color:var(--gray);text-decoration:underline;padding:0}
+.blink:hover{color:var(--text)}
+.tabs{display:flex;background:var(--navy2);border-bottom:2px solid var(--border);overflow-x:auto;padding:0 12px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{padding:11px 15px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--gray);border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:all .2s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+.bdg{background:var(--red);color:#fff;font-size:10px;padding:1px 5px;border-radius:8px;margin-left:4px;vertical-align:middle}
+.main{padding:16px;max-width:1600px;margin:0 auto}
+.panel{display:none}.panel.active{display:block}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto}
+.overlay.hidden{display:none}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;width:100%;max-width:440px;position:relative;margin:auto}
+.modal.wide{max-width:680px}
+.modal.xl{max-width:960px}
+.modal h2{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;text-transform:uppercase;color:var(--gold);margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:9px;padding-right:28px}
+.mcl{position:absolute;top:16px;right:16px;background:none;border:none;color:var(--gray);cursor:pointer;font-size:19px;line-height:1}
+.mcl:hover{color:var(--text)}
+.fg{margin-bottom:12px}
+.fg label,.fg>span.lbl{display:block;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gray);margin-bottom:4px}
+select,input[type=number],input[type=text],input[type=email],input[type=password]{width:100%;padding:9px 11px;background:var(--navy);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Barlow',sans-serif;font-size:14px;transition:border-color .2s}
+select:focus,input:focus{outline:none;border-color:var(--blue-lt)}
+.fr{display:flex;gap:10px;align-items:flex-end}
+.fr .fg{flex:1}
+.vsl{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:16px;color:var(--gold);padding-bottom:10px;flex-shrink:0}
+.em{color:var(--red);font-size:12px;margin-top:4px}
+textarea{width:100%;padding:9px 11px;background:var(--navy);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Barlow',sans-serif;font-size:13px;resize:vertical;min-height:60px}
+textarea:focus{outline:none;border-color:var(--blue-lt)}
+.btn{padding:8px 18px;border:none;border-radius:8px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:1px;text-transform:uppercase;transition:all .2s}
+.btn-p{background:var(--gold);color:var(--navy);width:100%;margin-top:4px}
+.btn-p:hover{background:var(--gold-lt);transform:translateY(-1px)}
+.btn-s{background:var(--border);color:var(--text)}
+.btn-s:hover{background:#2a4a7f}
+.btn-d{background:#7f1d1d;color:#fca5a5}
+.btn-d:hover{background:#991b1b}
+.btn-ok{background:#065f46;color:#6ee7b7}
+.btn-ok:hover{background:#047857}
+.btn-w{background:#78350f;color:#fcd34d}
+.btn-w:hover{background:#92400e}
+.btn-sm{padding:4px 10px;font-size:11px}
+.btn-ol{background:transparent;border:1px solid var(--border);color:var(--gray)}
+.btn-ol:hover{border-color:var(--gold);color:var(--gold)}
+.btn-bl{background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.4);color:var(--blue-lt)}
+.btn-bl:hover{background:rgba(59,130,246,.25)}
+.cb{font-size:10px;font-weight:700;letter-spacing:1px;padding:2px 6px;border-radius:4px;text-transform:uppercase;display:inline-block}
+.c1{background:rgba(245,158,11,.2);color:var(--c1)}
+.c2{background:rgba(59,130,246,.2);color:var(--c2)}
+.c3{background:rgba(16,185,129,.2);color:var(--c3)}
+.c4{background:rgba(168,85,247,.2);color:var(--c4)}
+.c5{background:rgba(236,72,153,.2);color:var(--c5)}
+.c6{background:rgba(6,182,212,.2);color:var(--c6)}
+.clA{background:rgba(239,68,68,.2);color:var(--cA)}
+.clB{background:rgba(249,115,22,.2);color:var(--cB)}
+.clC{background:rgba(234,179,8,.2);color:var(--cC)}
+.clD{background:rgba(34,197,94,.2);color:var(--cD)}
+.conf-grid{display:grid;grid-template-columns:repeat(var(--nc,4),1fr);gap:12px}
+@media(max-width:1100px){.conf-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.conf-grid{grid-template-columns:1fr}}
+.cblk{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.chdr{padding:9px 13px;display:flex;align-items:center;gap:7px;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:14px;text-transform:uppercase;letter-spacing:1px}
+.stbl{width:100%;border-collapse:collapse}
+.stbl th{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gray);padding:6px 7px;text-align:center;background:var(--card2)}
+.stbl th:first-child{text-align:left;padding-left:11px}
+.stbl td{padding:7px 7px;text-align:center;font-size:12px;border-top:1px solid var(--border)}
+.stbl td:first-child{text-align:left;padding-left:11px}
+.stbl tr:hover td{background:rgba(255,255,255,.03)}
+.qr td{background:rgba(26,86,219,.07)!important}
+.cr td{background:rgba(245,158,11,.07)!important}
+.rnk{font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--gray);font-size:11px;margin-right:3px}
+.pct{font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--gold)}
+.wc{color:var(--green);font-weight:600}
+.lc{color:var(--red);font-weight:600}
+.sn{display:inline-flex;width:19px;height:19px;border-radius:50%;background:var(--gold);color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:10px;align-items:center;justify-content:center;margin-right:4px;flex-shrink:0}
+.sn.s2{background:var(--c2);color:#fff}.sn.s3{background:var(--c3);color:#fff}.sn.s4{background:var(--c4);color:#fff}.sn.s5{background:var(--c5);color:#fff}.sn.s6{background:var(--c6);color:#fff}
+.class-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.clsblk{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.clshdr{padding:9px 13px;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:14px;text-transform:uppercase;letter-spacing:1px}
+.clshdr.hA{background:rgba(239,68,68,.12);border-bottom:2px solid var(--cA);color:var(--cA)}
+.clshdr.hB{background:rgba(249,115,22,.12);border-bottom:2px solid var(--cB);color:var(--cB)}
+.clshdr.hC{background:rgba(234,179,8,.12);border-bottom:2px solid var(--cC);color:var(--cC)}
+.clshdr.hD{background:rgba(34,197,94,.12);border-bottom:2px solid var(--cD);color:var(--cD)}
+.fbar{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.fbtn{padding:5px 12px;border:1px solid var(--border);border-radius:14px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.5px;background:transparent;color:var(--gray);transition:all .2s;font-family:'Barlow Condensed',sans-serif;text-transform:uppercase}
+.fbtn.active,.fbtn:hover{border-color:var(--gold);color:var(--gold)}
+.grow{display:flex;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:9px 12px;margin-bottom:6px;gap:8px;font-size:12px}
+.grow.played{opacity:.7}
+.gt{flex:1;font-weight:600}
+.gscore{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--gold);min-width:58px;text-align:center}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--border);flex-shrink:0}
+.dot.on{background:var(--green)}
+.ptxt{color:var(--gray);font-style:italic;font-size:11px}
+.ri{display:flex;align-items:center;background:var(--navy);padding:8px 10px;border-radius:8px;margin-bottom:5px;gap:8px;font-size:12px}
+.sdsp{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--gold);margin:0 7px;min-width:46px;text-align:center}
+.no-res{color:var(--gray);font-size:13px;text-align:center;padding:14px}
+.eic{cursor:pointer;color:var(--gray);font-size:11px;padding:3px 6px;border-radius:5px;border:1px solid transparent}
+.eic:hover{color:var(--gold);border-color:var(--gold)}
+.pcard{background:var(--card);border:1px solid rgba(249,115,22,.4);border-radius:9px;padding:12px 14px;margin-bottom:8px}
+.pcard .pt{font-weight:700;font-size:13px;margin-bottom:3px}
+.pcard .ps{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;color:var(--orange);margin-bottom:5px}
+.pcard .pe{font-size:11px;color:var(--gray)}
+.arow{display:flex;gap:7px;margin-top:7px}
+.info{background:rgba(26,86,219,.1);border:1px solid rgba(59,130,246,.3);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--gray);margin-bottom:12px}
+.wbox{background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.3);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--orange);margin-bottom:11px}
+.sbox{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--green)}
+.leg{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:13px;font-size:12px;color:var(--gray)}
+.li{display:flex;align-items:center;gap:5px}
+.ld{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+.stitle{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:16px;text-transform:uppercase;letter-spacing:1px;color:var(--text);margin-bottom:11px;display:flex;align-items:center;gap:7px}
+.dvd{border:none;border-top:1px solid var(--border);margin:14px 0}
+.ebar{display:flex;gap:7px;margin-bottom:13px;flex-wrap:wrap}
+.scard{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+.scard h2{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:18px;text-transform:uppercase;letter-spacing:1px;color:var(--gold);margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:8px}
+.toast{position:fixed;bottom:18px;right:18px;background:var(--green);color:#fff;padding:11px 16px;border-radius:10px;font-weight:600;font-size:13px;transform:translateY(100px);opacity:0;transition:all .3s;z-index:400;max-width:320px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.te{background:var(--red)}.toast.tw{background:var(--orange)}
+.share-tabs{display:flex;gap:6px;margin-bottom:12px}
+.stab{padding:6px 12px;border:1px solid var(--border);border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;background:transparent;color:var(--gray);transition:all .2s}
+.stab.active{background:rgba(245,158,11,.15);border-color:var(--gold);color:var(--gold)}
+.ssec{display:none}.ssec.active{display:block}
+.surl{display:flex;gap:7px;margin:8px 0}
+.surl input{flex:1;font-size:11px;font-family:monospace;background:var(--navy);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px}
+.steps{list-style:none;counter-reset:s}
+.steps li{counter-increment:s;display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;font-size:13px;color:var(--text-dim)}
+.steps li::before{content:counter(s);display:flex;width:19px;height:19px;border-radius:50%;background:var(--gold);color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:11px;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.nlbtn{display:inline-flex;align-items:center;gap:5px;background:#00ad9f;color:#fff;padding:8px 15px;border-radius:8px;font-weight:700;font-size:13px;text-decoration:none;margin-top:6px}
+.nlbtn:hover{background:#009d8f}
+.anav{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:16px}
+.anb{padding:6px 14px;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;background:transparent;color:var(--gray);transition:all .2s}
+.anb.active{background:rgba(245,158,11,.15);border-color:var(--gold);color:var(--gold)}
+.asub{display:none}.asub.active{display:block}
+.tmgr{max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:5px}
+.trow{display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:6px;border:1px solid transparent;margin-bottom:3px;background:var(--navy2);font-size:12px}
+.trow:hover{border-color:var(--border)}
+.tn{flex:1;font-weight:600}
+.trow select{width:auto;padding:3px 7px;font-size:11px}
+.atr{display:flex;gap:7px;margin-top:9px;align-items:flex-end;flex-wrap:wrap}
+.atr input,.atr select{width:auto;flex:1;min-width:120px}
+.arccard{background:var(--card2);border:1px solid var(--border);border-radius:9px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:11px}
+.arccard .ay{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:19px;color:var(--gold);flex-shrink:0}
+.arccard .am{font-size:12px;color:var(--gray);flex:1}
+/* ── FIREBASE STATUS BANNER ── */
+#fb-banner{display:none;align-items:center;justify-content:center;text-align:center;padding:7px 16px;font-size:12px;font-weight:500;border-bottom:1px solid;gap:6px}
+/* ── SETUP GUIDE ── */
+.sg-step{display:flex;gap:12px;margin-bottom:18px;align-items:flex-start}
+.sg-num{width:28px;height:28px;border-radius:50%;background:var(--gold);color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.sg-body{flex:1}
+.sg-body h3{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;color:var(--text)}
+.sg-body p{font-size:13px;color:var(--text-dim);line-height:1.5}
+.sg-body code{background:var(--navy);border:1px solid var(--border);padding:1px 6px;border-radius:4px;font-size:12px;color:var(--gold);font-family:monospace}
+.sg-body a{color:var(--blue-lt)}
+.sg-divider{border:none;border-top:1px solid var(--border);margin:16px 0}
+.sg-highlight{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:10px 13px;font-size:12px;color:var(--gold-lt);margin-top:8px}
+.sg-img{width:100%;border-radius:8px;border:1px solid var(--border);margin-top:6px;background:var(--navy2);padding:8px;font-size:11px;color:var(--gray);text-align:center;font-style:italic}
+.team-link{cursor:pointer;transition:color .15s}
+.team-link:hover{color:var(--gold-lt);text-decoration:underline}
+.tp-header{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.tp-logo{width:56px;height:56px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;flex-shrink:0}
+.tp-info{flex:1}
+.tp-name{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:26px;text-transform:uppercase;letter-spacing:1px;line-height:1.1;margin-bottom:5px}
+.tp-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tp-record{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:18px}
+@media(max-width:560px){.tp-record{grid-template-columns:repeat(3,1fr)}}
+.tp-stat{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center}
+.tp-stat .sv{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:28px;line-height:1}
+.tp-stat .sl{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gray);margin-top:3px}
+.tp-stat.sw .sv{color:var(--green)}
+.tp-stat.sl2 .sv{color:var(--red)}
+.tp-stat.st .sv{color:var(--gray)}
+.tp-stat.sp .sv{color:var(--gold)}
+.tp-stat.sgf .sv{color:#38bdf8}
+.tp-stat.sga .sv{color:#fb923c}
+.tp-sched-title{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:14px;text-transform:uppercase;letter-spacing:1px;color:var(--gray);margin-bottom:10px}
+.tp-game{display:flex;align-items:center;background:var(--navy);border:1px solid var(--border);border-radius:8px;padding:10px 13px;margin-bottom:6px;gap:10px;font-size:13px;transition:border-color .15s}
+.tp-game:hover{border-color:var(--border)}
+.tp-game.win{border-left:3px solid var(--green)}
+.tp-game.loss{border-left:3px solid var(--red)}
+.tp-game.tie{border-left:3px solid var(--gray)}
+.tp-game.unplayed{border-left:3px solid var(--border);opacity:.7}
+.tp-opp{flex:1;font-weight:600}
+.tp-score{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;min-width:60px;text-align:center}
+.tp-score.win{color:var(--green)}
+.tp-score.loss{color:var(--red)}
+.tp-score.tie{color:var(--gray)}
+.tp-result{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;min-width:28px;text-align:center}
+.tp-result.win{color:var(--green)}
+.tp-result.loss{color:var(--red)}
+.tp-result.tie{color:var(--gray)}
+.tp-streak{display:inline-flex;gap:3px;margin-top:4px;flex-wrap:wrap}
+.tp-streak span{width:14px;height:14px;border-radius:3px;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif}
+.tp-streak .sw{background:rgba(16,185,129,.3);color:var(--green)}
+.tp-streak .sl{background:rgba(239,68,68,.3);color:var(--red)}
+.tp-streak .st{background:rgba(148,163,184,.2);color:var(--gray)}
+.tp-rank-row{display:flex;align-items:center;gap:12px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px 15px;margin-bottom:16px}
+.tp-rank-num{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:32px;color:var(--gold);line-height:1;min-width:40px}
+.tp-rank-info{font-size:12px;color:var(--gray)}
+.tp-rank-info strong{color:var(--text);display:block;font-size:14px;margin-bottom:2px}
+@media(max-width:600px){.fr{flex-direction:column}.vsl{padding-bottom:0}header h1{font-size:17px}.conf-grid,.class-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- FIREBASE STATUS BANNER -->
+<div id="fb-banner"></div>
+
+<!-- TABS -->
+<div class="overlay hidden" id="setup-ov">
+  <div class="modal xl" style="max-width:620px;max-height:90vh;overflow-y:auto">
+    <button class="mcl" onclick="closeSetupGuide()">✕</button>
+    <h2>🚀 Go Live in 15 Minutes</h2>
+    <p style="font-size:13px;color:var(--gray);margin-bottom:18px">Follow these steps once and your site will be live at a real URL, updating in real time for anyone in the world.</p>
+
+    <div class="sg-step">
+      <div class="sg-num">1</div>
+      <div class="sg-body">
+        <h3>Create a Free Firebase Account</h3>
+        <p>Go to <a href="https://firebase.google.com" target="_blank">firebase.google.com</a> and click <strong>Get Started</strong>. Sign in with any Google account (Gmail works).</p>
+      </div>
+    </div>
+
+    <div class="sg-step">
+      <div class="sg-num">2</div>
+      <div class="sg-body">
+        <h3>Create a New Project</h3>
+        <p>Click <strong>"Add project"</strong> → name it <code>nassau-lacrosse</code> → disable Google Analytics → click <strong>Create project</strong>. Wait about 10 seconds for it to finish.</p>
+      </div>
+    </div>
+
+    <div class="sg-step">
+      <div class="sg-num">3</div>
+      <div class="sg-body">
+        <h3>Set Up the Realtime Database</h3>
+        <p>In the left sidebar click <strong>Build → Realtime Database → Create Database</strong>. Choose <strong>United States</strong> as the region. When asked about security rules, choose <strong>"Start in test mode"</strong> → click Enable.</p>
+      </div>
+    </div>
+
+    <div class="sg-step">
+      <div class="sg-num">4</div>
+      <div class="sg-body">
+        <h3>Get Your Config Keys</h3>
+        <p>Click the <strong>⚙️ gear icon</strong> next to "Project Overview" → <strong>Project settings</strong>. Scroll down to <strong>"Your apps"</strong> and click the <strong>&lt;/&gt; Web</strong> icon. Give the app a nickname like <code>nassau-lax</code> → click <strong>Register app</strong>.</p>
+        <p style="margin-top:6px">You'll see a block of code. Copy the 7 values inside <code>firebaseConfig</code> — you need all of them for the next step.</p>
+        <div class="sg-highlight">📋 The values look like: apiKey, authDomain, databaseURL, projectId, storageBucket, messagingSenderId, appId</div>
+      </div>
+    </div>
+
+    <div class="sg-step">
+      <div class="sg-num">5</div>
+      <div class="sg-body">
+        <h3>Paste Your Keys Into the HTML File</h3>
+        <p>Open <code>nassau_lacrosse_2026.html</code> in Notepad (Windows) or TextEdit (Mac). Find this section near the bottom of the file:</p>
+        <div style="background:var(--navy);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-top:6px;font-family:monospace;font-size:11px;color:var(--text-dim);line-height:1.7">
+          apiKey: <span style="color:var(--orange)">"PASTE_YOUR_API_KEY_HERE"</span>,<br>
+          authDomain: <span style="color:var(--orange)">"PASTE_YOUR_AUTH_DOMAIN_HERE"</span>,<br>
+          databaseURL: <span style="color:var(--orange)">"PASTE_YOUR_DATABASE_URL_HERE"</span>,<br>
+          <span style="color:var(--gray)">... and so on for all 7 values</span>
+        </div>
+        <p style="margin-top:8px">Replace each <code>PASTE_YOUR_..._HERE</code> with the real value from Firebase. Keep the quotes around each value. Save the file when done.</p>
+      </div>
+    </div>
+
+    <div class="sg-step">
+      <div class="sg-num">6</div>
+      <div class="sg-body">
+        <h3>Set Firebase Security Rules</h3>
+        <p>In Firebase Console, go to <strong>Realtime Database → Rules</strong> tab. Replace everything there with this and click <strong>Publish</strong>:</p>
+        <div style="background:var(--navy);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-top:6px;font-family:monospace;font-size:12px;color:var(--green)">
+          {<br>&nbsp;&nbsp;"rules": {<br>&nbsp;&nbsp;&nbsp;&nbsp;"ncgl2026": {<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".read": true,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".write": true<br>&nbsp;&nbsp;&nbsp;&nbsp;}<br>&nbsp;&nbsp;}<br>}
+        </div>
+      </div>
+    </div>
+
+    <div class="sg-step">
+      <div class="sg-num">7</div>
+      <div class="sg-body">
+        <h3>Deploy to Netlify (Your Live URL)</h3>
+        <p><strong>a)</strong> Go to <a href="https://app.netlify.com/drop" target="_blank">app.netlify.com/drop</a> in your browser.<br>
+        <strong>b)</strong> Drag and drop your updated <code>nassau_lacrosse_2026.html</code> file onto the page.<br>
+        <strong>c)</strong> Netlify gives you a URL like <code>https://lively-fox-abc123.netlify.app</code> — that's your live site!<br>
+        <strong>d)</strong> To get a better URL: click <strong>Site configuration → Site details → Change site name</strong> and rename it to something like <code>nassau-lacrosse-2026</code>.<br>
+        Your final URL will be: <code style="color:var(--green)">https://nassau-lacrosse-2026.netlify.app</code></p>
+      </div>
+    </div>
+
+    <div class="sg-step">
+      <div class="sg-num">8</div>
+      <div class="sg-body">
+        <h3>You're Live! 🎉</h3>
+        <p>Share your Netlify URL with coaches, parents, and league officials. From now on:</p>
+        <ul style="font-size:13px;color:var(--text-dim);margin-top:6px;padding-left:16px;line-height:2">
+          <li>Admin enters scores → all visitors see the update within 1–2 seconds</li>
+          <li>Coaches submit scores for review → appears in admin queue instantly</li>
+          <li>Anyone can view standings, schedules, and team pages from any device</li>
+        </ul>
+        <div class="sg-highlight" style="margin-top:10px">💡 <strong>Updating the site later:</strong> If you get a new version of the HTML file from Claude, just paste your same Firebase config into the new file and drag it to Netlify again. Your data is safe in Firebase — nothing gets reset.</div>
+      </div>
+    </div>
+
+    <hr class="sg-divider">
+    <p style="font-size:12px;color:var(--gray);text-align:center">Both Firebase and Netlify are free for this use case. No credit card required.</p>
+    <button class="btn btn-p" style="margin-top:12px" onclick="closeSetupGuide()">Got it — let's go! 🚀</button>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="overlay hidden" id="edit-ov">
+  <div class="modal">
+    <button class="mcl" onclick="closeEdit()">✕</button>
+    <h2>✏️ Edit Score</h2>
+    <div id="edit-info" style="font-size:12px;color:var(--gray);margin-bottom:11px"></div>
+    <div class="fr">
+      <div class="fg"><label id="edit-hl">Home</label><input type="number" id="edit-hs" min="0" value="0"></div>
+      <div class="vsl">–</div>
+      <div class="fg"><label id="edit-al">Away</label><input type="number" id="edit-as" min="0" value="0"></div>
+    </div>
+    <div style="display:flex;gap:7px;margin-top:9px">
+      <button class="btn btn-p" onclick="saveEdit()" style="flex:2">Save</button>
+      <button class="btn btn-d btn-sm" onclick="deleteResult()" style="flex:1">Remove</button>
+    </div>
+  </div>
+</div>
+
+<!-- SHARE MODAL -->
+<div class="overlay hidden" id="share-ov">
+  <div class="modal wide">
+    <button class="mcl" onclick="closeShare()">✕</button>
+    <h2>🔗 Share Standings</h2>
+    <div class="share-tabs">
+      <button class="stab active" onclick="switchShareTab('link',this)">📋 Share Link</button>
+      <button class="stab" onclick="switchShareTab('host',this)">🌐 Host Online</button>
+    </div>
+    <div class="ssec active" id="ss-link">
+      <p style="font-size:13px;color:var(--gray);margin-bottom:8px">Generate a snapshot link with all current scores baked in. Anyone who opens it sees the standings exactly as they are right now.</p>
+      <div class="wbox">⚠️ This link is a snapshot. Re-generate after each score update to share the latest.</div>
+      <button class="btn btn-p" style="width:auto;padding:8px 18px;margin-bottom:8px" onclick="generateShareLink()">⚡ Generate Share Link</button>
+      <div class="surl" id="share-url-row" style="display:none">
+        <input type="text" id="share-url-inp" readonly>
+        <button class="btn btn-s btn-sm" onclick="copyShareLink()">Copy</button>
+      </div>
+      <div id="share-copied" class="sbox" style="display:none;margin-top:7px">✓ Copied to clipboard!</div>
+      <div id="share-size" style="font-size:11px;color:var(--gray);margin-top:4px"></div>
+    </div>
+    <div class="ssec" id="ss-host">
+      <p style="font-size:13px;color:var(--gray);margin-bottom:10px">Host this file online so everyone gets a permanent, bookmarkable URL — free, no technical skills needed.</p>
+      <ol class="steps">
+        <li><div><strong>Download the HTML file</strong> from Claude to your computer.</div></li>
+        <li><div><strong>Go to <a href="https://app.netlify.com/drop" target="_blank" style="color:var(--blue-lt)">app.netlify.com/drop</a></strong> — free, no account needed.</div></li>
+        <li><div><strong>Drag &amp; drop</strong> your <code style="background:var(--navy);padding:1px 5px;border-radius:3px;font-size:11px">.html</code> file onto the page.</div></li>
+        <li><div><strong>Copy your live URL</strong> like <code style="background:var(--navy);padding:1px 5px;border-radius:3px;font-size:11px">nassau-lax.netlify.app</code> and share it!</div></li>
+        <li><div><strong>Re-deploy any time</strong> by dragging an updated file again.</div></li>
+      </ol>
+      <a href="https://app.netlify.com/drop" target="_blank" class="nlbtn">🚀 Open Netlify Drop →</a>
+    </div>
+  </div>
+</div>
+
+<!-- ARCHIVE VIEWER MODAL -->
+<div class="overlay hidden" id="arc-ov">
+  <div class="modal xl">
+    <button class="mcl" onclick="closeArcView()">✕</button>
+    <h2 id="arc-modal-title">📦 Archives</h2>
+    <div id="arc-modal-body" style="overflow-y:auto;max-height:75vh"></div>
+  </div>
+</div>
+
+<!-- TEAM PROFILE MODAL -->
+<div class="overlay hidden" id="team-ov">
+  <div class="modal wide" id="team-modal-inner">
+    <button class="mcl" onclick="closeTeamProfile()">✕</button>
+    <div id="team-modal-body"></div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">NL</div>
+  <div>
+    <h1><span class="sub">Nassau County</span>Girls Lacrosse <span id="title-year">2026</span></h1>
+  </div>
+  <div class="hright">
+    <button class="btn btn-bl btn-sm" onclick="openShare()">🔗 Share</button>
+    <button class="btn btn-ol btn-sm" onclick="openArcList()">📦 Archives</button>
+    <button class="btn btn-ol btn-sm" onclick="openSetupGuide()" style="border-color:rgba(16,185,129,.4);color:#6ee7b7">🚀 Go Live</button>
+    <span id="admin-pill" style="display:none" class="upill">🔑 Admin</span>
+    <button id="logout-btn" style="display:none" class="blink" onclick="adminLogout()">Logout</button>
+  </div>
+</header>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" data-tab="conf" onclick="switchTab('conf')">🏟 Conference Standings</div>
+  <div class="tab" data-tab="class" onclick="switchTab('class')">🏆 Class Standings</div>
+  <div class="tab" data-tab="schedule" onclick="switchTab('schedule')">📅 Schedule</div>
+  <div class="tab" data-tab="results" onclick="switchTab('results')">🏁 Recent Results</div>
+  <div class="tab" data-tab="submit" onclick="switchTab('submit')">📬 Submit Score</div>
+  <div class="tab" data-tab="login" onclick="switchTab('login')">🔐 Admin Login</div>
+  <div class="tab" data-tab="admin" style="display:none" onclick="switchTab('admin')">⚙️ Admin <span class="bdg" id="pending-badge" style="display:none">0</span></div>
+</div>
+
+<div class="main">
+
+<!-- CONFERENCE STANDINGS -->
+<div id="panel-conf" class="panel active">
+  <div class="leg">
+    <div class="li"><div class="ld" style="background:rgba(26,86,219,.3);border:1px solid #3b82f6"></div>Conf 1 &amp; 2 — all teams qualify for playoffs</div>
+    <div class="li"><div class="ld" style="background:rgba(16,185,129,.2);border:1px solid #10b981"></div>Conf 3 — fills remaining playoff bracket spots by class standing</div>
+    <div class="li"><div class="ld" style="background:rgba(245,158,11,.2);border:1px solid #f59e0b"></div>Conf 4 — conference champion per class qualifies for playoffs only</div>
+  </div>
+  <div class="ebar"><button class="btn btn-ol btn-sm" onclick="exportCSV('conf')">📊 Export to Google Sheets</button></div>
+  <div class="conf-grid" id="conf-standings" style="--nc:4"></div>
+</div>
+
+<!-- CLASS STANDINGS -->
+<div id="panel-class" class="panel">
+  <div class="info">⚠️ <strong>Playoff seeding:</strong> Conf 1 (all) → Conf 2 (all) → Conf 3 (fills remaining spots) → Conf 4 (champion only per class). No lower-conference team can jump a higher-conference team. Ties broken by head-to-head.</div>
+  <div class="ebar"><button class="btn btn-ol btn-sm" onclick="exportCSV('class')">📊 Export to Google Sheets</button></div>
+  <div class="class-grid" id="class-standings"></div>
+</div>
+
+<!-- SCHEDULE -->
+<div id="panel-schedule" class="panel">
+  <div class="fbar" id="sched-fbar">
+    <button class="fbtn active" onclick="filterSched('all',this)">All</button>
+    <button class="fbtn" onclick="filterSched('pending',this)">Unplayed</button>
+    <button class="fbtn" onclick="filterSched('played',this)">Played</button>
+  </div>
+  <div class="ebar"><button class="btn btn-ol btn-sm" onclick="exportCSV('schedule')">📊 Export to Google Sheets</button></div>
+  <div id="sched-list"></div>
+</div>
+
+<!-- RECENT RESULTS (public) -->
+<div id="panel-results" class="panel">
+  <div class="fbar" id="results-fbar">
+    <button class="fbtn active" onclick="filterResults('all',this)">All</button>
+    <button class="fbtn" onclick="filterResults('1',this)"><span class="cb c1">Conf 1</span></button>
+    <button class="fbtn" onclick="filterResults('2',this)"><span class="cb c2">Conf 2</span></button>
+    <button class="fbtn" onclick="filterResults('3',this)"><span class="cb c3">Conf 3</span></button>
+    <button class="fbtn" onclick="filterResults('4',this)"><span class="cb c4">Conf 4</span></button>
+  </div>
+  <div id="results-list-pub"></div>
+</div>
+
+<!-- SUBMIT SCORE -->
+<div id="panel-submit" class="panel">
+  <div class="scard" style="max-width:540px;margin:0 auto">
+    <h2>📬 Submit a Score (Coach)</h2>
+    <p style="font-size:13px;color:var(--gray);margin-bottom:13px">Scores submitted here go to admin for review before appearing in standings.</p>
+    <div class="fg"><label>Your Email Address *</label><input type="email" id="sub-email" placeholder="coach@school.edu"></div>
+    <div class="fr">
+      <div class="fg"><label>Home Team</label><select id="sub-home" onchange="checkSubGame()"></select></div>
+      <div class="vsl">VS</div>
+      <div class="fg"><label>Away Team</label><select id="sub-away" onchange="checkSubGame()"></select></div>
+    </div>
+    <div class="fr" style="margin-top:4px">
+      <div class="fg"><label id="sub-hl">Home Score</label><input type="number" id="sub-hs" min="0" value="0"></div>
+      <div class="vsl">–</div>
+      <div class="fg"><label id="sub-al">Away Score</label><input type="number" id="sub-as" min="0" value="0"></div>
+    </div>
+    <div class="fg" style="margin-top:7px"><label>Notes (optional)</label><textarea id="sub-notes" placeholder="Any info for the admin..."></textarea></div>
+    <div id="sub-err" class="em" style="display:none"></div>
+    <button class="btn btn-p" onclick="coachSubmit()">📤 Submit for Review</button>
+  </div>
+</div>
+
+<!-- LOGIN TAB -->
+<div id="panel-login" class="panel">
+  <div style="max-width:360px;margin:40px auto">
+    <div class="scard">
+      <h2>🔐 Admin Login</h2>
+      <div class="fg"><label>Username</label><input type="text" id="login-user" placeholder="Username" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <div class="fg"><label>Password</label><input type="password" id="login-pass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <div class="em" id="login-err" style="display:none;margin-bottom:8px"></div>
+      <button class="btn btn-p" onclick="doLogin()">Login</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN PANEL -->
+<div id="panel-admin" class="panel">
+  <div class="anav">
+    <button class="anb active" onclick="switchAdminSub('scores',this)">⚽ Scores</button>
+    <button class="anb" onclick="switchAdminSub('pending',this)">📬 Pending <span class="bdg" id="psub-bdg" style="display:none">0</span></button>
+    <button class="anb" onclick="switchAdminSub('conferences',this)">🏟 Conferences &amp; Teams</button>
+    <button class="anb" onclick="switchAdminSub('archive',this)">📦 Archive / New Season</button>
+  </div>
+
+  <!-- SCORES -->
+  <div class="asub active" id="asub-scores">
+    <div class="stitle">⚽ Enter / Edit Result</div>
+    <div class="scard" style="max-width:580px">
+      <div class="fr">
+        <div class="fg"><label>Home Team</label><select id="adm-home" onchange="checkAdminGame()"></select></div>
+        <div class="vsl">VS</div>
+        <div class="fg"><label>Away Team</label><select id="adm-away" onchange="checkAdminGame()"></select></div>
+      </div>
+      <div class="fr" style="margin-top:5px">
+        <div class="fg"><label id="adm-hl">Home Score</label><input type="number" id="adm-hs" min="0" value="0"></div>
+        <div class="vsl">–</div>
+        <div class="fg"><label id="adm-al">Away Score</label><input type="number" id="adm-as" min="0" value="0"></div>
+      </div>
+      <div id="adm-err" class="em" style="display:none"></div>
+      <div id="adm-exist" style="font-size:12px;color:var(--orange);margin:4px 0;display:none"></div>
+      <button class="btn btn-p" onclick="adminSubmitScore()">✓ Submit Result</button>
+    </div>
+    <div class="stitle">📋 Recent Results</div>
+    <div id="results-list"></div>
+  </div>
+
+  <!-- PENDING -->
+  <div class="asub" id="asub-pending">
+    <div class="stitle">📬 Pending Coach Submissions</div>
+    <div id="pending-list"><p class="no-res">No pending submissions.</p></div>
+  </div>
+
+  <!-- CONFERENCES & TEAMS -->
+  <div class="asub" id="asub-conferences">
+    <div class="stitle">🏟 Conference &amp; Team Management</div>
+    <div class="info">Changes take effect immediately. Rebuilds the schedule while preserving all existing scores.</div>
+    <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:15px;flex-wrap:wrap">
+      <div class="fg" style="margin:0">
+        <label>Number of Conferences</label>
+        <select id="num-conf-sel" onchange="changeNumConferences()" style="width:auto">
+          <option value="2">2</option><option value="3">3</option>
+          <option value="4" selected>4</option><option value="5">5</option><option value="6">6</option>
+        </select>
+      </div>
+      <span id="conf-counts" style="font-size:12px;color:var(--gray);padding-bottom:2px"></span>
+    </div>
+    <div id="conf-mgr"></div>
+    <div class="dvd"></div>
+    <div class="stitle" style="font-size:14px">➕ Add New Team</div>
+    <div class="atr">
+      <input type="text" id="nt-name" placeholder="Team name" style="flex:3;min-width:140px">
+      <select id="nt-cls" style="flex:1;min-width:100px;width:auto">
+        <option value="A">Class A</option><option value="B">Class B</option>
+        <option value="C">Class C</option><option value="D">Class D</option>
+      </select>
+      <select id="nt-conf" style="flex:1;min-width:110px;width:auto"></select>
+      <button class="btn btn-ok btn-sm" onclick="addNewTeam()" style="flex-shrink:0;white-space:nowrap">+ Add</button>
+    </div>
+    <div id="nt-err" class="em" style="display:none;margin-top:4px"></div>
+  </div>
+
+  <!-- ARCHIVE -->
+  <div class="asub" id="asub-archive">
+    <div class="stitle">📦 Archive &amp; New Season</div>
+    <div class="wbox">⚠️ <strong>Archiving saves all current standings, then resets scores for a fresh season.</strong> The year in the title advances by 1. This cannot be undone.</div>
+    <div class="scard" style="max-width:480px">
+      <h2>Archive <span id="arc-yr">2026</span> Season</h2>
+      <p style="font-size:13px;color:var(--gray);margin-bottom:12px">
+        This will:<br>
+        • Save all <strong id="arc-gc">0</strong> played results from <span id="arc-yr2">2026</span><br>
+        • Reset all scores to start a fresh season<br>
+        • Change the title to <strong>Girls Lacrosse <span id="arc-ny">2027</span></strong><br>
+        • Keep the archived data accessible via the Archives button
+      </p>
+      <div class="fg"><label>Type the current year to confirm</label><input type="text" id="arc-confirm" placeholder="e.g. 2026"></div>
+      <div id="arc-err" class="em" style="display:none"></div>
+      <button class="btn btn-w" onclick="archiveSeason()" style="width:100%;margin-top:7px">📦 Archive &amp; Start New Season</button>
+    </div>
+    <div class="dvd"></div>
+    <div class="stitle">Previous Archives</div>
+    <div id="arc-list-admin"></div>
+  </div>
+</div>
+
+</div><!-- end .main -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── DEFAULT TEAMS (51, verified from Excel) ──────────────────────────────────
+const DEFAULT_TEAMS=[
+  {id:'GC',name:'Garden City',conf:1,cls:'B'},
+  {id:'SS',name:'Southside',conf:1,cls:'C'},
+  {id:'CSH',name:'Cold Spring Harbor',conf:1,cls:'D'},
+  {id:'MAN',name:'Manhasset',conf:1,cls:'B'},
+  {id:'LB',name:'Long Beach',conf:1,cls:'B'},
+  {id:'PEQ',name:'Massapequa',conf:1,cls:'A'},
+  {id:'WAN',name:'Wantagh',conf:1,cls:'C'},
+  {id:'PORT',name:'Port Washington',conf:1,cls:'A'},
+  {id:'SYO',name:'Syosset',conf:1,cls:'A'},
+  {id:'NS',name:'North Shore',conf:1,cls:'C'},
+  {id:'FARM',name:'Farmingdale',conf:1,cls:'A'},
+  {id:'LYN',name:'Lynbrook',conf:1,cls:'C'},
+  {id:'SEA',name:'Seaford',conf:2,cls:'C'},
+  {id:'PLAIN',name:'Plainedge',conf:2,cls:'C'},
+  {id:'CAL',name:'Calhoun',conf:2,cls:'B'},
+  {id:'LV',name:'Locust Valley',conf:2,cls:'D'},
+  {id:'OCEAN',name:'Oceanside',conf:2,cls:'A'},
+  {id:'BETH',name:'Bethpage',conf:2,cls:'B'},
+  {id:'MEP',name:'Mepham',conf:2,cls:'B'},
+  {id:'CP',name:'Carle Place',conf:2,cls:'D'},
+  {id:'MAC',name:'MacArthur',conf:2,cls:'B'},
+  {id:'ROS',name:'Roslyn',conf:2,cls:'B'},
+  {id:'DIV',name:'Division',conf:2,cls:'B'},
+  {id:'FA',name:'Friends Academy',conf:2,cls:'C'},
+  {id:'MIN',name:'Mineola',conf:3,cls:'C'},
+  {id:'BALD',name:'Baldwin',conf:3,cls:'A'},
+  {id:'HICK',name:'Hicksville',conf:3,cls:'A'},
+  {id:'OB',name:'Oyster Bay',conf:3,cls:'D'},
+  {id:'EM',name:'East Meadow',conf:3,cls:'A'},
+  {id:'POB',name:'Plainview-Old Bethpage',conf:3,cls:'A'},
+  {id:'FP',name:'Floral Park',conf:3,cls:'C'},
+  {id:'HEW',name:'Hewlett',conf:3,cls:'B'},
+  {id:'BELL',name:'Bellmore JFK',conf:3,cls:'B'},
+  {id:'NHP',name:'New Hyde Park',conf:3,cls:'B'},
+  {id:'CAREY',name:'Carey',conf:3,cls:'B'},
+  {id:'WHE',name:'Wheatley',conf:3,cls:'D'},
+  {id:'GCOVE',name:'Glen Cove',conf:4,cls:'B'},
+  {id:'IT',name:'Island Trees',conf:4,cls:'C'},
+  {id:'CLAR',name:'Clarke',conf:4,cls:'C'},
+  {id:'MER',name:'Malverne/Rockaway',conf:4,cls:'C'},
+  {id:'WH',name:'West Hempstead',conf:4,cls:'D'},
+  {id:'FREE',name:'Freeport',conf:4,cls:'B'},
+  {id:'JER',name:'Jericho',conf:4,cls:'A'},
+  {id:'VSC',name:'Valley Stream',conf:4,cls:'A'},
+  {id:'GN_NORTH',name:'Great Neck North',conf:4,cls:'B'},
+  {id:'HERR',name:'Herricks',conf:4,cls:'A'},
+  {id:'GN_SOUTH',name:'Great Neck South',conf:4,cls:'A'},
+  {id:'ELM',name:'Elmont',conf:4,cls:'C'},
+  {id:'SEW',name:'Sewanhaka',conf:4,cls:'B'},
+  {id:'HEMP',name:'Hempstead',conf:4,cls:'A'},
+  {id:'ROOS',name:'Roosevelt',conf:4,cls:'B'},
+];
+
+const PLAYOFF_SPOTS={A:8,B:10,C:8,D:4};
+const SK='ncgl2026_v6';
+
+// ID migration map: old broken IDs → correct new IDs
+const ID_MIGRATION={
+  'GNN':'GN_NORTH',  // was "GNN (Garden City S.)" Class A → now Great Neck North Class B
+  'GNS':'GN_SOUTH',  // was "GNS (Great Neck S.)" Class B → now Great Neck South Class A
+};
+
+function migrateGameIds(games){
+  // Rewrite any game that used old team IDs so scores are preserved
+  return (games||[]).map(g=>{
+    let home=ID_MIGRATION[g.home]||g.home;
+    let away=ID_MIGRATION[g.away]||g.away;
+    let id=`${home}__${away}`;
+    return{...g,id,home,away};
+  });
+}
+
+function migrateTeams(teams){
+  // If loaded teams still have old IDs, fix them in place
+  return (teams||[]).map(t=>{
+    if(t.id==='GNN') return{...t,id:'GN_NORTH',name:'Great Neck North',cls:'B',conf:4};
+    if(t.id==='GNS') return{...t,id:'GN_SOUTH',name:'Great Neck South',cls:'A',conf:4};
+    return t;
+  });
+}
+
+let TEAMS=[];
+let TM={};
+function buildTM(){TM={};TEAMS.forEach(t=>TM[t.id]=t);}
+
+function makeSchedule(teams){
+  const t=teams||TEAMS;
+  const games=[];
+  const confs=[...new Set(t.map(x=>x.conf))].sort();
+  confs.forEach(conf=>{
+    const ct=t.filter(x=>x.conf===conf&&!x._ph);
+    for(let i=0;i<ct.length;i++)
+      for(let j=i+1;j<ct.length;j++)
+        games.push({id:`${ct[i].id}__${ct[j].id}`,home:ct[i].id,away:ct[j].id,conf,homeScore:null,awayScore:null,played:false});
+  });
+  return games;
+}
+
+function mergeGames(fresh,saved){
+  const m={};(saved||[]).forEach(g=>{if(g.played)m[g.id]=g;});
+  fresh.forEach(g=>{if(m[g.id]){g.played=true;g.homeScore=m[g.id].homeScore;g.awayScore=m[g.id].awayScore;}});
+  return fresh;
+}
+
+function loadState(){
+  // URL hash
+  try{
+    const h=window.location.hash;
+    if(h&&h.startsWith('#data=')){
+      const parsed=JSON.parse(decodeURIComponent(atob(h.slice(6))));
+      const migratedTeams=migrateTeams(parsed.teams||JSON.parse(JSON.stringify(DEFAULT_TEAMS)));
+      TEAMS=migratedTeams;buildTM();
+      const migratedGames=migrateGameIds(parsed.games||[]);
+      const st={teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:[],year:parsed.year||2026,archives:parsed.archives||[]};
+      try{localStorage.setItem(SK,JSON.stringify(st));}catch(e){}
+      history.replaceState(null,'',location.pathname+location.search);
+      return st;
+    }
+  }catch(e){console.warn('hash:',e);}
+
+  // Try current key (v6)
+  try{
+    const s=localStorage.getItem(SK);
+    if(s){
+      const parsed=JSON.parse(s);
+      // Always use DEFAULT_TEAMS as the source of truth for team definitions,
+      // but preserve any custom teams that were added via the admin panel
+      const defaultIds=new Set(DEFAULT_TEAMS.map(t=>t.id));
+      const customTeams=(parsed.teams||[]).filter(t=>!defaultIds.has(t.id)&&!defaultIds.has(ID_MIGRATION[t.id]));
+      TEAMS=[...JSON.parse(JSON.stringify(DEFAULT_TEAMS)),...customTeams];
+      buildTM();
+      const migratedGames=migrateGameIds(parsed.games||[]);
+      return{teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:parsed.pending||[],year:parsed.year||2026,archives:parsed.archives||[]};
+    }
+  }catch(e){console.warn('v6 load:',e);}
+
+  // Try migrating from old v5 key — preserves all previously entered scores
+  try{
+    const old=localStorage.getItem('ncgl2026_v5');
+    if(old){
+      const parsed=JSON.parse(old);
+      TEAMS=JSON.parse(JSON.stringify(DEFAULT_TEAMS));buildTM();
+      const migratedGames=migrateGameIds(parsed.games||[]);
+      const st={teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:parsed.pending||[],year:parsed.year||2026,archives:parsed.archives||[]};
+      // Save under new key right away
+      try{localStorage.setItem(SK,JSON.stringify(st));}catch(e){}
+      return st;
+    }
+  }catch(e){console.warn('v5 migration:',e);}
+
+  // Fresh start
+  TEAMS=JSON.parse(JSON.stringify(DEFAULT_TEAMS));buildTM();
+  return{teams:TEAMS,games:makeSchedule(),pending:[],year:2026,archives:[]};
+}
+
+function saveState(){
+  state.teams=TEAMS;
+  // 1. Save locally as fallback, clear old keys
+  try{
+    localStorage.setItem(SK,JSON.stringify(state));
+    ['ncgl2026_v5','ncgl2026_v4','ncgl2026_v3'].forEach(k=>{try{localStorage.removeItem(k);}catch(e){}});
+  }catch(e){console.error(e);}
+  // 2. Save to Firebase so ALL visitors see updates instantly
+  if(window._fbDB){
+    window._fbDB.ref('ncgl2026').set({
+      games:state.games,
+      teams:TEAMS.filter(t=>!t._ph),
+      pending:state.pending||[],
+      year:state.year||2026,
+      archives:state.archives||[]
+    }).catch(e=>console.error('Firebase save error:',e));
+  }
+}
+
+let state=loadState();
+let isAdmin=false,editGameId=null,schedFilter='all';
+if(!state.pending)state.pending=[];
+if(!state.archives)state.archives=[];
+
+// ── TITLE ──────────────────────────────────────────────────────────────────
+function updateTitle(){
+  const y=state.year||2026;
+  document.getElementById('title-year').textContent=y;
+  document.title=`Nassau County Girls Lacrosse ${y}`;
+  ['arc-yr','arc-yr2'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=y;});
+  const ny=document.getElementById('arc-ny');if(ny)ny.textContent=y+1;
+  const gc=document.getElementById('arc-gc');if(gc)gc.textContent=state.games.filter(g=>g.played).length;
+}
+
+// ── AUTH ───────────────────────────────────────────────────────────────────
+function doLogin(){
+  const u=document.getElementById('login-user').value.trim();
+  const p=document.getElementById('login-pass').value;
+  const err=document.getElementById('login-err');
+  if(u==='Admin'&&p==='Lacrosse2026'){
+    isAdmin=true;
+    document.getElementById('admin-pill').style.display='flex';
+    document.getElementById('logout-btn').style.display='';
+    document.querySelector('[data-tab="login"]').style.display='none';
+    document.querySelector('[data-tab="admin"]').style.display='';
+    switchTab('admin');renderAll();showToast('Welcome, Admin!');
+  }else{err.textContent='Invalid username or password.';err.style.display='block';}
+}
+function adminLogout(){
+  isAdmin=false;
+  document.getElementById('admin-pill').style.display='none';
+  document.getElementById('logout-btn').style.display='none';
+  document.querySelector('[data-tab="login"]').style.display='';
+  document.querySelector('[data-tab="admin"]').style.display='none';
+  switchTab('conf');renderAll();showToast('Logged out','tw');
+}
+
+// ── STANDINGS ─────────────────────────────────────────────────────────────
+function computeStandings(){
+  const rec={};
+  TEAMS.forEach(t=>{rec[t.id]={w:0,l:0,t:0,gf:0,ga:0,h2h:{}};TEAMS.forEach(o=>{if(o.id!==t.id)rec[t.id].h2h[o.id]={w:0,l:0,t:0};});});
+  state.games.forEach(g=>{
+    if(!g.played)return;
+    const h=rec[g.home],a=rec[g.away];if(!h||!a)return;
+    const hs=g.homeScore,as=g.awayScore;
+    h.gf+=hs;h.ga+=as;a.gf+=as;a.ga+=hs;
+    if(hs>as){h.w++;a.l++;h.h2h[g.away].w++;a.h2h[g.home].l++;}
+    else if(as>hs){a.w++;h.l++;a.h2h[g.home].w++;h.h2h[g.away].l++;}
+    else{h.t++;a.t++;h.h2h[g.away].t++;a.h2h[g.home].t++;}
+  });
+  return rec;
+}
+
+function sortTeams(ids,rec){
+  return[...ids].sort((a,b)=>{
+    const ra=rec[a],rb=rec[b];if(!ra||!rb)return 0;
+    const ga=ra.w+ra.l+ra.t,gb=rb.w+rb.l+rb.t;
+    const pa=ga>0?ra.w/ga:0,pb=gb>0?rb.w/gb:0;
+    // 1) Win percentage
+    if(pb!==pa)return pb-pa;
+    // 2) Head-to-head
+    const hh=ra.h2h[b];
+    if(hh&&(hh.w+hh.l+hh.t)>0){if(hh.w>hh.l)return -1;if(hh.l>hh.w)return 1;}
+    // 3) Most wins (2-0 ranks above 1-0)
+    if(rb.w!==ra.w)return rb.w-ra.w;
+    // 4) Fewest losses (0-2 ranks above 0-3)
+    if(ra.l!==rb.l)return ra.l-rb.l;
+    return 0;
+  });
+}
+function pctStr(r){const g=r.w+r.l+r.t;return g>0?(r.w/g).toFixed(3).replace(/^0/,''):'.000';}
+function cColor(c){return['#f59e0b','#3b82f6','#10b981','#a855f7','#ec4899','#06b6d4'][(c-1)%6];}
+function cClass(c){return c<=6?`c${c}`:'c1';}
+
+// ── SELECTS ───────────────────────────────────────────────────────────────
+function populateSelect(id){
+  const sel=document.getElementById(id);if(!sel)return;
+  const confs=[...new Set(TEAMS.map(t=>t.conf))].sort();
+  sel.innerHTML='';
+  confs.forEach(c=>{
+    const g=document.createElement('optgroup');g.label=`Conference ${c}`;
+    TEAMS.filter(t=>t.conf===c&&!t._ph).forEach(t=>{const o=document.createElement('option');o.value=t.id;o.textContent=t.name;g.appendChild(o);});
+    sel.appendChild(g);
+  });
+}
+function initSelects(){
+  ['adm-home','adm-away','sub-home','sub-away'].forEach(id=>populateSelect(id));
+  try{document.getElementById('adm-away').selectedIndex=1;}catch(e){}
+  try{document.getElementById('sub-away').selectedIndex=1;}catch(e){}
+  const confs=[...new Set(TEAMS.map(t=>t.conf))].sort();
+  // schedule filter conf buttons
+  const fb=document.getElementById('sched-fbar');
+  fb.querySelectorAll('.cfbtn').forEach(b=>b.remove());
+  confs.forEach(c=>{
+    const b=document.createElement('button');b.className='fbtn cfbtn';
+    b.innerHTML=`<span class="cb ${cClass(c)}">C${c}</span>`;
+    b.onclick=function(){filterSched(String(c),this);};
+    fb.appendChild(b);
+  });
+  // num conf select
+  const ns=document.getElementById('num-conf-sel');if(ns)ns.value=confs.length;
+  // new team conf select
+  const nc=document.getElementById('nt-conf');
+  if(nc){nc.innerHTML='';confs.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=`Conference ${c}`;nc.appendChild(o);});}
+}
+
+// ── ADMIN GAME CHECK ──────────────────────────────────────────────────────
+function checkAdminGame(){
+  const hId=document.getElementById('adm-home').value,aId=document.getElementById('adm-away').value;
+  const ew=document.getElementById('adm-err'),ex=document.getElementById('adm-exist');
+  ew.style.display='none';ex.style.display='none';
+  if(!hId||!aId||hId===aId||!TM[hId]||!TM[aId])return;
+  if(TM[hId].conf!==TM[aId].conf){ew.textContent='These teams are in different conferences.';ew.style.display='block';return;}
+  document.getElementById('adm-hl').textContent=TM[hId].name+' Score';
+  document.getElementById('adm-al').textContent=TM[aId].name+' Score';
+  const g=findGame(hId,aId);
+  if(g&&g.played){
+    const hs=g.home===hId?g.homeScore:g.awayScore;
+    const as=g.home===hId?g.awayScore:g.homeScore;
+    // Show existing result with duplicate warning — pre-fill scores for easy editing
+    ex.innerHTML=`🚫 <strong>Game already has a result:</strong> ${TM[hId].name} ${hs}–${as} ${TM[aId].name} &nbsp;·&nbsp; Teams play each other once. Use <strong>✏️ Edit</strong> in Recent Results to correct it.`;
+    ex.style.background='rgba(239,68,68,.1)';
+    ex.style.border='1px solid rgba(239,68,68,.3)';
+    ex.style.borderRadius='7px';
+    ex.style.padding='8px 11px';
+    ex.style.color='#fca5a5';
+    ex.style.fontSize='12px';
+    ex.style.display='block';
+    document.getElementById('adm-hs').value=hs;
+    document.getElementById('adm-as').value=as;
+  }else{
+    document.getElementById('adm-hs').value=0;
+    document.getElementById('adm-as').value=0;
+  }
+}
+function checkSubGame(){
+  const h=document.getElementById('sub-home').value,a=document.getElementById('sub-away').value;
+  if(h&&TM[h])document.getElementById('sub-hl').textContent=TM[h].name+' Score';
+  if(a&&TM[a])document.getElementById('sub-al').textContent=TM[a].name+' Score';
+}
+function findGame(a,b){return state.games.find(g=>(g.home===a&&g.away===b)||(g.home===b&&g.away===a));}
+
+// ── ADMIN SCORE SUBMIT ────────────────────────────────────────────────────
+function clampScore(v){return Math.min(99,Math.max(0,parseInt(v)||0));}
+
+function adminSubmitScore(){
+  const hId=document.getElementById('adm-home').value,aId=document.getElementById('adm-away').value;
+  const hs=clampScore(document.getElementById('adm-hs').value);
+  const as=clampScore(document.getElementById('adm-as').value);
+  const ew=document.getElementById('adm-err');ew.style.display='none';
+  if(!hId||!aId||hId===aId){ew.textContent='Select two different teams.';ew.style.display='block';return;}
+  if(!TM[hId]||!TM[aId]){ew.textContent='Team not found.';ew.style.display='block';return;}
+  if(TM[hId].conf!==TM[aId].conf){ew.textContent='Must be same conference.';ew.style.display='block';return;}
+  const g=findGame(hId,aId);if(!g){ew.textContent='Game not in schedule.';ew.style.display='block';return;}
+
+  // Duplicate prevention — each team pair plays once per season
+  if(g.played){
+    const existHS=g.home===hId?g.homeScore:g.awayScore;
+    const existAS=g.home===hId?g.awayScore:g.homeScore;
+    ew.innerHTML=`⚠️ <strong>Score already entered for this game:</strong> ${TM[hId].name} ${existHS}–${existAS} ${TM[aId].name}.<br>
+    Each team only plays each other once per season. To correct this score, use the <strong>✏️ Edit</strong> button in the Recent Results list below.`;
+    ew.style.display='block';
+    showToast(`⚠️ Duplicate — ${TM[hId].name} vs ${TM[aId].name} already has a result`,'tw');
+    return;
+  }
+
+  if(g.home===hId){g.homeScore=hs;g.awayScore=as;}else{g.homeScore=as;g.awayScore=hs;}
+  g.played=true;saveState();renderAll();
+  showToast(`✓ ${TM[hId].name} ${hs}–${as} ${TM[aId].name}`);
+  document.getElementById('adm-exist').style.display='none';
+  document.getElementById('adm-err').style.display='none';
+}
+
+function approvePending(i){
+  const s=state.pending[i];const g=findGame(s.homeId,s.awayId);
+  if(!g){showToast('Game not found in schedule','te');return;}
+  if(g.played){
+    if(!confirm(`⚠️ This game already has a result: ${TM[g.home]?.name||g.home} ${g.homeScore}–${g.awayScore} ${TM[g.away]?.name||g.away}.\n\nApproving will overwrite it. Continue?`))return;
+  }
+  if(g.home===s.homeId){g.homeScore=s.homeScore;g.awayScore=s.awayScore;}else{g.homeScore=s.awayScore;g.awayScore=s.homeScore;}
+  g.played=true;state.pending.splice(i,1);saveState();renderAll();showToast('✓ Score approved');
+}
+function rejectPending(i){if(!confirm('Reject?'))return;state.pending.splice(i,1);saveState();renderAll();showToast('Rejected','tw');}
+
+function coachSubmit(){
+  const email=document.getElementById('sub-email').value.trim();
+  const hId=document.getElementById('sub-home').value,aId=document.getElementById('sub-away').value;
+  const hs=clampScore(document.getElementById('sub-hs').value);
+  const as=clampScore(document.getElementById('sub-as').value);
+  const notes=document.getElementById('sub-notes').value.trim();
+  const ew=document.getElementById('sub-err');ew.style.display='none';
+  if(!email||!email.includes('@')){ew.textContent='Enter a valid email.';ew.style.display='block';return;}
+  if(!hId||!aId||hId===aId){ew.textContent='Select two different teams.';ew.style.display='block';return;}
+  if(!TM[hId]||!TM[aId]){ew.textContent='Team not found.';ew.style.display='block';return;}
+  if(TM[hId].conf!==TM[aId].conf){ew.textContent='Teams must be in the same conference.';ew.style.display='block';return;}
+  state.pending.push({homeId:hId,awayId:aId,homeScore:hs,awayScore:as,email,notes,ts:Date.now()});
+  saveState();renderAll();
+  document.getElementById('sub-email').value='';
+  document.getElementById('sub-hs').value=0;document.getElementById('sub-as').value=0;
+  document.getElementById('sub-notes').value='';
+  showToast('✓ Submitted for review!');
+}
+
+// ── EDIT MODAL ────────────────────────────────────────────────────────────
+function openEdit(gid){
+  if(!isAdmin)return;editGameId=gid;
+  const g=state.games.find(x=>x.id===gid);if(!g)return;
+  const ht=TM[g.home]||{name:g.home},at=TM[g.away]||{name:g.away};
+  document.getElementById('edit-info').textContent=`${ht.name} vs ${at.name} — Conference ${g.conf}`;
+  document.getElementById('edit-hl').textContent=ht.name;document.getElementById('edit-al').textContent=at.name;
+  document.getElementById('edit-hs').value=g.homeScore??0;document.getElementById('edit-as').value=g.awayScore??0;
+  document.getElementById('edit-ov').classList.remove('hidden');
+}
+function closeEdit(){document.getElementById('edit-ov').classList.add('hidden');editGameId=null;}
+document.getElementById('edit-ov').addEventListener('click',e=>{if(e.target===document.getElementById('edit-ov'))closeEdit();});
+function saveEdit(){
+  if(!editGameId)return;const g=state.games.find(x=>x.id===editGameId);if(!g)return;
+  g.homeScore=clampScore(document.getElementById('edit-hs').value);
+  g.awayScore=clampScore(document.getElementById('edit-as').value);
+  g.played=true;saveState();renderAll();closeEdit();showToast('✓ Score updated');
+}
+function deleteResult(){
+  if(!editGameId||!confirm('Remove this result?'))return;
+  const g=state.games.find(x=>x.id===editGameId);if(!g)return;
+  g.played=false;g.homeScore=null;g.awayScore=null;
+  saveState();renderAll();closeEdit();showToast('Result removed','tw');
+}
+
+// ── CONFERENCE MANAGER ────────────────────────────────────────────────────
+function changeNumConferences(){
+  const target=parseInt(document.getElementById('num-conf-sel').value);
+  const confs=[...new Set(TEAMS.map(t=>t.conf))].sort();
+  const cur=confs.length,maxConf=Math.max(...confs);
+  if(target===cur)return;
+  if(target<cur){
+    const toRemove=maxConf;
+    if(!confirm(`Remove Conference ${toRemove}? All teams in it will move to Conference ${toRemove-1}.`)){
+      document.getElementById('num-conf-sel').value=cur;return;
+    }
+    TEAMS.forEach(t=>{if(t.conf===toRemove)t.conf=toRemove-1;});
+  }else{
+    // Add new conference — insert placeholder so it appears in grid
+    const newConf=maxConf+1;
+    const pid=`_PH_C${newConf}`;
+    if(!TEAMS.find(t=>t.id===pid))
+      TEAMS.push({id:pid,name:`[Placeholder — assign teams to Conf ${newConf}]`,conf:newConf,cls:'A',_ph:true});
+    showToast(`Conference ${newConf} added. Move teams into it using the dropdowns.`);
+  }
+  buildTM();rebuildSchedule();saveState();renderAll();renderConfMgr();initSelects();
+}
+
+function moveTeamToConf(tid,newConf){
+  const t=TEAMS.find(x=>x.id===tid);if(!t)return;
+  t.conf=parseInt(newConf);
+  // Remove placeholder from target if present
+  TEAMS=TEAMS.filter(x=>!(x._ph&&x.conf===parseInt(newConf)&&x.id!==tid));
+  buildTM();rebuildSchedule();saveState();renderAll();renderConfMgr();initSelects();
+  showToast(`${t.name} → Conference ${newConf}`);
+}
+function changeTeamClass(tid,cls){
+  const t=TEAMS.find(x=>x.id===tid);if(!t)return;
+  t.cls=cls;buildTM();saveState();renderAll();showToast(`${t.name} → Class ${cls}`);
+}
+function removeTeam(tid){
+  const t=TEAMS.find(x=>x.id===tid);if(!t)return;
+  if(!confirm(`Remove "${t.name}"?`))return;
+  TEAMS=TEAMS.filter(x=>x.id!==tid);
+  state.games=state.games.filter(g=>g.home!==tid&&g.away!==tid);
+  buildTM();saveState();renderAll();renderConfMgr();initSelects();
+  showToast(`${t.name} removed`,'tw');
+}
+function addNewTeam(){
+  const name=document.getElementById('nt-name').value.trim();
+  const cls=document.getElementById('nt-cls').value;
+  const conf=parseInt(document.getElementById('nt-conf').value);
+  const err=document.getElementById('nt-err');err.style.display='none';
+  if(!name){err.textContent='Enter a team name.';err.style.display='block';return;}
+  const id='T'+Date.now();
+  TEAMS.push({id,name,conf,cls});
+  buildTM();rebuildSchedule();saveState();renderAll();renderConfMgr();initSelects();
+  document.getElementById('nt-name').value='';
+  showToast(`✓ ${name} added to Conference ${conf}`);
+}
+
+function rebuildSchedule(){
+  const old={};state.games.forEach(g=>{if(g.played)old[g.id]=g;});
+  state.games=mergeGames(makeSchedule(),Object.values(old));
+}
+
+function renderConfMgr(){
+  const confs=[...new Set(TEAMS.map(t=>t.conf))].sort();
+  const cc=document.getElementById('conf-counts');
+  if(cc)cc.textContent=confs.map(c=>`C${c}: ${TEAMS.filter(t=>t.conf===c&&!t._ph).length}`).join(' · ');
+  const el=document.getElementById('conf-mgr');if(!el)return;
+  el.innerHTML=confs.map(conf=>{
+    const ct=TEAMS.filter(t=>t.conf===conf);
+    const col=cColor(conf);
+    return `<div style="background:var(--card2);border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-bottom:10px">
+      <div style="padding:8px 13px;border-bottom:2px solid ${col};font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13px;text-transform:uppercase;display:flex;align-items:center;gap:7px">
+        <span class="cb ${cClass(conf)}">Conf ${conf}</span> Conference ${conf} — ${ct.filter(t=>!t._ph).length} teams
+      </div>
+      <div style="padding:7px">
+        ${ct.map(t=>`<div class="trow">
+          <span class="tn">${t.name}${t._ph?'<span style="font-size:10px;color:var(--gray);margin-left:5px">(placeholder)</span>':''}</span>
+          <span style="font-size:10px;color:var(--gray)">Conf:</span>
+          <select style="width:auto;padding:3px 6px;font-size:11px" onchange="moveTeamToConf('${t.id}',this.value)">
+            ${confs.map(c=>`<option value="${c}"${c===t.conf?' selected':''}>${c}</option>`).join('')}
+          </select>
+          <span style="font-size:10px;color:var(--gray)">Class:</span>
+          <select style="width:auto;padding:3px 6px;font-size:11px" onchange="changeTeamClass('${t.id}',this.value)">
+            ${['A','B','C','D'].map(cl=>`<option value="${cl}"${cl===t.cls?' selected':''}>${cl}</option>`).join('')}
+          </select>
+          ${!t._ph?`<button class="btn btn-d btn-sm" style="font-size:10px;padding:2px 7px" onclick="removeTeam('${t.id}')">✕</button>`:''}
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── ARCHIVE ───────────────────────────────────────────────────────────────
+function archiveSeason(){
+  const year=state.year||2026;
+  const input=document.getElementById('arc-confirm').value.trim();
+  const err=document.getElementById('arc-err');err.style.display='none';
+  if(input!==String(year)){err.textContent=`Type "${year}" exactly to confirm.`;err.style.display='block';return;}
+  const played=state.games.filter(g=>g.played);
+  if(played.length===0&&!confirm('No games played yet. Archive anyway?'))return;
+  state.archives=state.archives||[];
+  state.archives.unshift({year,archivedAt:Date.now(),teams:JSON.parse(JSON.stringify(TEAMS.filter(t=>!t._ph))),games:JSON.parse(JSON.stringify(played)),gamesPlayed:played.length});
+  state.year=year+1;state.pending=[];
+  TEAMS=TEAMS.filter(t=>!t._ph);buildTM();state.games=makeSchedule();
+  saveState();updateTitle();renderAll();renderArcListAdmin();
+  document.getElementById('arc-confirm').value='';
+  showToast(`✓ ${year} archived! Season ${year+1} started.`);
+}
+
+function renderArcListAdmin(){
+  const el=document.getElementById('arc-list-admin');if(!el)return;
+  const arcs=state.archives||[];
+  if(!arcs.length){el.innerHTML='<p class="no-res">No archives yet.</p>';return;}
+  el.innerHTML=arcs.map((a,i)=>`
+    <div class="arccard">
+      <div class="ay">${a.year}</div>
+      <div class="am">${a.gamesPlayed} games played · Archived ${new Date(a.archivedAt).toLocaleDateString()}</div>
+      <button class="btn btn-bl btn-sm" onclick="viewArchive(${i})">📋 View</button>
+    </div>`).join('');
+}
+
+function openArcList(){
+  const arcs=state.archives||[];
+  const body=document.getElementById('arc-modal-body');
+  document.getElementById('arc-modal-title').textContent='📦 Season Archives';
+  if(!arcs.length){
+    body.innerHTML='<p class="no-res" style="padding:18px 0">No archived seasons yet. Admin → Archive tab to save a season.</p>';
+  }else{
+    body.innerHTML=arcs.map((a,i)=>`
+      <div class="arccard">
+        <div class="ay">${a.year}</div>
+        <div class="am">${a.gamesPlayed} games · Archived ${new Date(a.archivedAt).toLocaleDateString()}<br>${(a.teams||[]).length} teams, ${[...new Set((a.teams||[]).map(t=>t.conf))].length} conferences</div>
+        <button class="btn btn-bl btn-sm" onclick="viewArchive(${i})">📋 View</button>
+      </div>`).join('');
+  }
+  document.getElementById('arc-ov').classList.remove('hidden');
+}
+
+function viewArchive(idx){
+  const a=state.archives[idx];
+  const aT={};(a.teams||[]).forEach(t=>aT[t.id]=t);
+  const rec={};
+  (a.teams||[]).forEach(t=>{rec[t.id]={w:0,l:0,t:0,h2h:{}};(a.teams||[]).forEach(o=>{if(o.id!==t.id)rec[t.id].h2h[o.id]={w:0,l:0,t:0};});});
+  (a.games||[]).forEach(g=>{
+    const h=rec[g.home],av=rec[g.away];if(!h||!av)return;
+    if(g.homeScore>g.awayScore){h.w++;av.l++;}else if(g.awayScore>g.homeScore){av.w++;h.l++;}else{h.t++;av.t++;}
+  });
+  const confs=[...new Set((a.teams||[]).map(t=>t.conf))].sort();
+  let html=`<div style="font-size:12px;color:var(--gray);margin-bottom:12px">${a.gamesPlayed} games · ${(a.teams||[]).length} teams · ${confs.length} conferences · Archived ${new Date(a.archivedAt).toLocaleDateString()}</div>`;
+  html+=`<div style="display:grid;grid-template-columns:repeat(${Math.min(confs.length,3)},1fr);gap:11px">`;
+  confs.forEach(conf=>{
+    const ct=(a.teams||[]).filter(t=>t.conf===conf);
+    const sorted=[...ct.map(t=>t.id)].sort((x,y)=>{
+      const rx=rec[x],ry=rec[y];if(!rx||!ry)return 0;
+      const gx=rx.w+rx.l+rx.t,gy=ry.w+ry.l+ry.t;
+      return(gy>0?ry.w/gy:0)-(gx>0?rx.w/gx:0);
+    });
+    const col=cColor(conf);
+    html+=`<div style="background:var(--card2);border:1px solid var(--border);border-radius:9px;overflow:hidden">
+      <div style="padding:8px 12px;border-bottom:2px solid ${col};font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13px;text-transform:uppercase">Conf ${conf}</div>
+      <table class="stbl"><thead><tr><th>Team</th><th>W</th><th>L</th><th>%</th></tr></thead><tbody>
+      ${sorted.map((tid,i)=>{
+        const r=rec[tid],t=aT[tid];if(!r||!t)return'';
+        const g=r.w+r.l+r.t;
+        return`<tr><td><span class="rnk">${i+1}</span>${t.name}</td><td class="wc">${r.w}</td><td class="lc">${r.l}</td><td class="pct">${g>0?(r.w/g).toFixed(3).replace(/^0/,''):'.000'}</td></tr>`;
+      }).join('')}
+      </tbody></table></div>`;
+  });
+  html+='</div>';
+  document.getElementById('arc-modal-title').textContent=`📦 ${a.year} Season`;
+  document.getElementById('arc-modal-body').innerHTML=html;
+  document.getElementById('arc-ov').classList.remove('hidden');
+}
+
+function closeArcView(){document.getElementById('arc-ov').classList.add('hidden');}
+document.getElementById('arc-ov').addEventListener('click',e=>{if(e.target===document.getElementById('arc-ov'))closeArcView();});
+
+// ── RENDER: CONFERENCE STANDINGS ──────────────────────────────────────────
+function renderConfStandings(){
+  const rec=computeStandings();
+  const confs=[...new Set(TEAMS.map(t=>t.conf))].sort();
+  const el=document.getElementById('conf-standings');
+  el.style.setProperty('--nc',Math.min(confs.length,4));
+  el.innerHTML='';
+  confs.forEach(conf=>{
+    const ct=TEAMS.filter(t=>t.conf===conf&&!t._ph);
+    const sorted=sortTeams(ct.map(t=>t.id),rec);
+    const isAll=conf<=2,isC3=conf===3,isChamp=conf>=4;
+    const col=cColor(conf),cc=cClass(conf);
+    const div=document.createElement('div');div.className='cblk';
+    div.innerHTML=`
+      <div class="chdr" style="background:${col}18;border-bottom:2px solid ${col}">
+        <span class="cb ${cc}">Conf ${conf}</span>
+        Conference ${conf}
+        <span style="margin-left:auto;font-size:9px;color:var(--gray)">${isAll?'✦ All qualify':isC3?'◈ Fills brackets':isChamp?'★ Champ only':''}</span>
+      </div>
+      <table class="stbl"><thead><tr><th>Team</th><th>Cls</th><th>W</th><th>L</th><th>T</th><th>%</th></tr></thead><tbody>
+      ${sorted.map((tid,idx)=>{
+        const r=rec[tid],t=TM[tid];if(!r||!t)return'';
+        const rc=isAll?'qr':isChamp&&idx===0?'cr':'';
+        return`<tr class="${rc}"><td><span class="rnk">${idx+1}</span><span class="team-link" onclick="openTeamProfile('${tid}')">${t.name}</span></td>
+          <td><span class="cb cl${t.cls}">${t.cls}</span></td>
+          <td class="wc">${r.w}</td><td class="lc">${r.l}</td><td>${r.t}</td><td class="pct">${pctStr(r)}</td></tr>`;
+      }).join('')}
+      </tbody></table>`;
+    el.appendChild(div);
+  });
+}
+
+// ── RENDER: CLASS STANDINGS ───────────────────────────────────────────────
+function renderClassStandings(){
+  const rec=computeStandings();
+  const confs=[...new Set(TEAMS.map(t=>t.conf))].sort();
+  const el=document.getElementById('class-standings');el.innerHTML='';
+  ['A','B','C','D'].forEach(cls=>{
+    const blocks=confs.map(c=>({conf:c,ids:sortTeams(TEAMS.filter(t=>t.cls===cls&&t.conf===c&&!t._ph).map(t=>t.id),rec)}));
+    // Build seeded list: conf<=2 all qualify, conf3 fills remaining (up to PLAYOFF_SPOTS), conf4+ champ only
+    const spots=PLAYOFF_SPOTS[cls];
+    const seeded=[];
+    blocks.forEach(({conf,ids})=>{
+      if(conf<=2)ids.forEach(id=>seeded.push({id,conf}));
+      else if(conf===3)ids.forEach(id=>seeded.push({id,conf}));
+      else if(ids.length>0)seeded.push({id:ids[0],conf}); // champ only
+    });
+    const seededCapped=seeded.slice(0,spots);
+    // All teams in class
+    const allIds=[];blocks.forEach(({ids})=>ids.forEach(id=>allIds.push(id)));
+    if(!allIds.length)return;
+    const div=document.createElement('div');div.className='clsblk';
+    div.innerHTML=`
+      <div class="clshdr h${cls}">Class ${cls} — Top ${spots} Qualify</div>
+      <table class="stbl"><thead><tr><th>Seed</th><th>Team</th><th>Conf</th><th>W</th><th>L</th><th>%</th></tr></thead><tbody>
+      ${allIds.map((tid,idx)=>{
+        const r=rec[tid],t=TM[tid];if(!r||!t)return'';
+        const si=seededCapped.findIndex(s=>s.id===tid);
+        const isSeed=si>=0;
+        const seed=si+1;
+        const sc=t.conf===1?'':` s${t.conf<=6?t.conf:1}`;
+        return`<tr ${isSeed?'class="qr"':''}>
+          <td>${isSeed?`<span class="sn${sc}">${seed}</span>`:`<span style="color:var(--gray);font-size:11px">${idx+1}</span>`}</td>
+          <td style="font-size:11px;font-weight:600"><span class="team-link" onclick="openTeamProfile('${tid}')">${t.name}</span></td>
+          <td><span class="cb ${cClass(t.conf)}">C${t.conf}</span></td>
+          <td class="wc">${r.w}</td><td class="lc">${r.l}</td><td class="pct">${pctStr(r)}</td>
+        </tr>`;
+      }).join('')}
+      </tbody></table>`;
+    el.appendChild(div);
+  });
+}
+
+// ── RENDER: SCHEDULE ──────────────────────────────────────────────────────
+function filterSched(f,el){
+  schedFilter=f;
+  document.querySelectorAll('#sched-fbar .fbtn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  renderSchedule();
+}
+function renderSchedule(){
+  let games=[...state.games];
+  if(schedFilter==='pending')games=games.filter(g=>!g.played);
+  else if(schedFilter==='played')games=games.filter(g=>g.played);
+  else if(!isNaN(parseInt(schedFilter)))games=games.filter(g=>g.conf==schedFilter);
+  const c=document.getElementById('sched-list');
+  if(!games.length){c.innerHTML='<p class="no-res">No games match this filter.</p>';return;}
+  c.innerHTML=games.map(g=>{
+    const ht=TM[g.home]||{name:g.home,cls:'?'},at=TM[g.away]||{name:g.away,cls:'?'};
+    const sc=g.played?`${g.homeScore}–${g.awayScore}`:'';
+    return`<div class="grow ${g.played?'played':''}">
+      <div class="dot ${g.played?'on':''}"></div>
+      <div><span class="cb ${cClass(g.conf)}">C${g.conf}</span></div>
+      <div class="gt">${ht.name} <span style="color:var(--gray)">vs</span> ${at.name}
+        <span class="cb cl${ht.cls}" style="margin-left:4px">${ht.cls}</span>
+      </div>
+      <div class="gscore">${g.played?sc:'<span class="ptxt">TBD</span>'}</div>
+      ${isAdmin?`<button class="eic" onclick="openEdit('${g.id}')">✏️</button>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ── RENDER: ADMIN PANEL ───────────────────────────────────────────────────
+function renderAdminPanel(){
+  if(!isAdmin)return;
+  const cnt=state.pending.length;
+  ['pending-badge','psub-bdg'].forEach(id=>{
+    const el=document.getElementById(id);if(el){el.textContent=cnt;el.style.display=cnt>0?'':'none';}
+  });
+  // pending list
+  const pl=document.getElementById('pending-list');
+  if(!cnt){pl.innerHTML='<p class="no-res">No pending submissions.</p>';}
+  else{pl.innerHTML=state.pending.map((s,i)=>{
+    const ht=TM[s.homeId]||{name:s.homeId,conf:0},at=TM[s.awayId]||{name:s.awayId};
+    return`<div class="pcard">
+      <div class="pt">${sanitize(ht.name)} vs ${sanitize(at.name)} <span class="cb ${cClass(ht.conf)}">C${ht.conf}</span></div>
+      <div class="ps">${sanitize(ht.name)} ${s.homeScore} – ${s.awayScore} ${sanitize(at.name)}</div>
+      <div class="pe">📧 ${sanitize(s.email)} · 🕐 ${new Date(s.ts).toLocaleString()}</div>
+      ${s.notes?`<div style="font-size:11px;color:var(--gray);margin-top:3px">📝 ${sanitize(s.notes)}</div>`:''}
+      <div class="arow">
+        <button class="btn btn-ok btn-sm" onclick="approvePending(${i})">✓ Approve</button>
+        <button class="btn btn-d btn-sm" onclick="rejectPending(${i})">✕ Reject</button>
+      </div>
+    </div>`;
+  }).join('');}
+  // recent results
+  const played=state.games.filter(g=>g.played).slice().reverse().slice(0,25);
+  const rl=document.getElementById('results-list');
+  if(!played.length){rl.innerHTML='<p class="no-res">No results yet.</p>';return;}
+  rl.innerHTML=played.map(g=>{
+    const ht=TM[g.home]||{name:g.home},at=TM[g.away]||{name:g.away};
+    const win=g.homeScore>g.awayScore?ht.name:g.awayScore>g.homeScore?at.name:'Tie';
+    return`<div class="ri">
+      <div style="flex:1"><span class="cb ${cClass(g.conf)}">C${g.conf}</span>
+        <strong style="margin-left:4px">${ht.name}</strong> <span style="color:var(--gray)">vs</span> <strong>${at.name}</strong>
+        <div style="font-size:10px;color:var(--gray);margin-top:2px">${win==='Tie'?'🤝 Tie':'🏆 '+win}</div>
+      </div>
+      <div class="sdsp">${g.homeScore}–${g.awayScore}</div>
+      <button class="eic" onclick="openEdit('${g.id}')">✏️</button>
+    </div>`;
+  }).join('');
+  renderConfMgr();renderArcListAdmin();
+}
+
+// ── RENDER: PUBLIC RECENT RESULTS ────────────────────────────────────────
+let resultsFilter='all';
+function filterResults(f,el){
+  resultsFilter=f;
+  document.querySelectorAll('#results-fbar .fbtn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  renderResults();
+}
+
+function renderResults(){
+  const el=document.getElementById('results-list-pub');if(!el)return;
+  let played=state.games.filter(g=>g.played).slice().reverse();
+  if(resultsFilter!=='all') played=played.filter(g=>g.conf==resultsFilter);
+  if(!played.length){el.innerHTML='<p class="no-res">No results yet this season.</p>';return;}
+  el.innerHTML=played.map(g=>{
+    const ht=TM[g.home]||{name:g.home,cls:'?',conf:g.conf};
+    const at=TM[g.away]||{name:g.away,cls:'?',conf:g.conf};
+    const hw=g.homeScore>g.awayScore,aw=g.awayScore>g.homeScore,tie=g.homeScore===g.awayScore;
+    return`<div style="display:flex;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 15px;margin-bottom:8px;gap:12px;flex-wrap:wrap">
+      <span class="cb ${cClass(g.conf)}" style="flex-shrink:0">C${g.conf}</span>
+      <div style="flex:1;min-width:160px;display:flex;align-items:center;gap:8px;justify-content:flex-end">
+        <span style="font-weight:${hw?'700':'400'};font-size:13px;opacity:${hw?'1':'0.65'};text-align:right;cursor:pointer" class="team-link" onclick="openTeamProfile('${g.home}')">${ht.name}</span>
+        <span class="cb cl${ht.cls}">${ht.cls}</span>
+      </div>
+      <div style="flex-shrink:0;text-align:center;min-width:80px">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;color:var(--gold);line-height:1">${g.homeScore} – ${g.awayScore}</div>
+        <div style="font-size:10px;color:var(--gray);margin-top:2px;text-transform:uppercase;letter-spacing:1px">${tie?'TIE':'Final'}</div>
+      </div>
+      <div style="flex:1;min-width:160px;display:flex;align-items:center;gap:8px">
+        <span class="cb cl${at.cls}">${at.cls}</span>
+        <span style="font-weight:${aw?'700':'400'};font-size:13px;opacity:${aw?'1':'0.65'};cursor:pointer" class="team-link" onclick="openTeamProfile('${g.away}')">${at.name}</span>
+      </div>
+      ${isAdmin?`<button class="eic" onclick="openEdit('${g.id}')" style="flex-shrink:0">✏️</button>`:''}
+    </div>`;
+  }).join('');
+}
+
+function renderAll(){
+  renderConfStandings();renderClassStandings();renderSchedule();renderResults();
+  if(isAdmin)renderAdminPanel();
+  updateTitle();initSelects();
+}
+
+// ── EXPORT CSV ────────────────────────────────────────────────────────────
+function exportCSV(type){
+  const rec=computeStandings();
+  const confs=[...new Set(TEAMS.map(t=>t.conf))].sort();
+  let rows=[],name='Nassau_Lacrosse';
+  if(type==='conf'){
+    rows.push(['Conference','Rank','Team','Class','W','L','T','Pct']);
+    confs.forEach(c=>{sortTeams(TEAMS.filter(t=>t.conf===c&&!t._ph).map(t=>t.id),rec).forEach((tid,i)=>{const r=rec[tid],t=TM[tid];const g=r.w+r.l+r.t;rows.push([c,i+1,t.name,t.cls,r.w,r.l,r.t,g>0?(r.w/g).toFixed(3):'0.000']);});});
+    name='Conference_Standings';
+  }else if(type==='class'){
+    rows.push(['Class','Seed','Team','Conference','W','L','T','Pct','Playoff']);
+    ['A','B','C','D'].forEach(cls=>{
+      const all=[];confs.forEach(c=>sortTeams(TEAMS.filter(t=>t.cls===cls&&t.conf===c&&!t._ph).map(t=>t.id),rec).forEach(id=>all.push({id,c})));
+      all.forEach(({id,c},i)=>{const r=rec[id],t=TM[id];const g=r.w+r.l+r.t;rows.push([cls,i+1,t.name,c,r.w,r.l,r.t,g>0?(r.w/g).toFixed(3):'0.000',i<PLAYOFF_SPOTS[cls]?'YES':'NO']);});
+    });name='Class_Standings';
+  }else{
+    rows.push(['Conference','Home','Away','Home Score','Away Score','Winner','Played']);
+    state.games.forEach(g=>{const ht=TM[g.home]||{name:g.home},at=TM[g.away]||{name:g.away};const w=g.played?(g.homeScore>g.awayScore?ht.name:g.awayScore>g.homeScore?at.name:'Tie'):'';rows.push([g.conf,ht.name,at.name,g.played?g.homeScore:'',g.played?g.awayScore:'',w,g.played?'YES':'NO']);});
+    name='Schedule';
+  }
+  const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`${name}_${state.year||2026}.csv`;a.click();URL.revokeObjectURL(url);
+  showToast('✓ CSV downloaded — File → Import in Google Sheets');
+}
+
+// ── SHARE ─────────────────────────────────────────────────────────────────
+function openShare(){document.getElementById('share-url-row').style.display='none';document.getElementById('share-copied').style.display='none';document.getElementById('share-size').textContent='';document.getElementById('share-ov').classList.remove('hidden');}
+function closeShare(){document.getElementById('share-ov').classList.add('hidden');}
+document.getElementById('share-ov').addEventListener('click',e=>{if(e.target===document.getElementById('share-ov'))closeShare();});
+function switchShareTab(n,el){document.querySelectorAll('.stab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.ssec').forEach(s=>s.classList.remove('active'));el.classList.add('active');document.getElementById('ss-'+n).classList.add('active');}
+function generateShareLink(){
+  try{
+    const played=state.games.filter(g=>g.played).map(g=>({id:g.id,home:g.home,away:g.away,conf:g.conf,homeScore:g.homeScore,awayScore:g.awayScore,played:true}));
+    const payload=JSON.stringify({teams:TEAMS.filter(t=>!t._ph),games:played,year:state.year,archives:[]});
+    const encoded=btoa(encodeURIComponent(payload));
+    const url=`${location.href.split('#')[0]}#data=${encoded}`;
+    document.getElementById('share-url-inp').value=url;
+    document.getElementById('share-url-row').style.display='flex';
+    document.getElementById('share-size').textContent=`${played.length} result${played.length!==1?'s':''} encoded · ~${Math.round(encoded.length/1024*10)/10} KB`;
+  }catch(e){showToast('Error generating link','te');}
+}
+function copyShareLink(){
+  const inp=document.getElementById('share-url-inp');
+  try{navigator.clipboard.writeText(inp.value).then(()=>{document.getElementById('share-copied').style.display='block';showToast('✓ Copied!');});}
+  catch(e){inp.select();document.execCommand('copy');document.getElementById('share-copied').style.display='block';showToast('✓ Copied!');}
+}
+
+// ── ADMIN SUB-TABS ────────────────────────────────────────────────────────
+function switchAdminSub(name,el){
+  document.querySelectorAll('.anb').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.asub').forEach(s=>s.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('asub-'+name).classList.add('active');
+  if(name==='conferences')renderConfMgr();
+  if(name==='archive'){renderArcListAdmin();updateTitle();}
+}
+
+// ── TAB SWITCHING ─────────────────────────────────────────────────────────
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===`panel-${name}`));
+  if(name==='admin')renderAdminPanel();
+  if(name==='results')renderResults();
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────────
+let tt;
+function showToast(msg,type=''){
+  const t=document.getElementById('toast');t.textContent=msg;
+  t.className='toast show';
+  if(type==='te')t.classList.add('te');else if(type==='tw')t.classList.add('tw');
+  clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),3500);
+}
+
+// ── TEAM PROFILE MODAL ───────────────────────────────────────────────────
+function sanitize(str){
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function openTeamProfile(teamId){
+  const t=TM[teamId];if(!t)return;
+  const rec=computeStandings();
+  const r=rec[teamId]||{w:0,l:0,t:0,gf:0,ga:0};
+
+  // All games involving this team
+  const teamGames=state.games.filter(g=>g.home===teamId||g.away===teamId);
+  const played=teamGames.filter(g=>g.played);
+  const totalG=r.w+r.l+r.t;
+  const pctDisp=totalG>0?(r.w/totalG).toFixed(3).replace(/^0/,''):'.000';
+
+  // Conference rank
+  const confTeams=TEAMS.filter(x=>x.conf===t.conf&&!x._ph);
+  const confSorted=sortTeams(confTeams.map(x=>x.id),rec);
+  const confRank=confSorted.indexOf(teamId)+1;
+  function ordinal(n){const s=['th','st','nd','rd'],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);}
+  const rankLabel=confRank===1?'Conference Leader':`${ordinal(confRank)} Place`;
+
+  // Streak — last 5 played results
+  const streakGames=played.slice().reverse().slice(0,5);
+  const streakHtml=streakGames.length?`<div class="tp-streak">${streakGames.map(g=>{
+    const isHome=g.home===teamId;
+    const myScore=isHome?g.homeScore:g.awayScore;
+    const oppScore=isHome?g.awayScore:g.homeScore;
+    const res=myScore>oppScore?'W':myScore<oppScore?'L':'T';
+    return`<span class="s${res.toLowerCase()}" title="${res}">${res}</span>`;
+  }).join('')}</div>`:'';
+
+  // Build color from conf
+  const col=cColor(t.conf);
+  const initials=t.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+
+  // Build game rows
+  const gameRows=teamGames.map(g=>{
+    const isHome=g.home===teamId;
+    const oppId=isHome?g.away:g.home;
+    const opp=TM[oppId]||{name:oppId,conf:t.conf,cls:'?'};
+    if(!g.played){
+      return`<div class="tp-game unplayed">
+        <div class="tp-opp"><span style="font-size:10px;color:var(--gray);margin-right:5px">${isHome?'vs':'@'}</span>${opp.name}</div>
+        <div class="tp-score" style="color:var(--gray);font-size:12px;font-style:italic">TBD</div>
+        <div class="tp-result" style="color:var(--gray)">—</div>
+      </div>`;
+    }
+    const myScore=isHome?g.homeScore:g.awayScore;
+    const oppScore=isHome?g.awayScore:g.homeScore;
+    const res=myScore>oppScore?'W':myScore<oppScore?'L':'T';
+    const resClass=res==='W'?'win':res==='L'?'loss':'tie';
+    return`<div class="tp-game ${resClass}">
+      <div class="tp-opp">
+        <span style="font-size:10px;color:var(--gray);margin-right:5px">${isHome?'vs':'@'}</span>
+        <span class="team-link" onclick="closeTeamProfile();setTimeout(()=>openTeamProfile('${oppId}'),80)">${opp.name}</span>
+        <span class="cb cl${opp.cls}" style="margin-left:5px">${opp.cls}</span>
+      </div>
+      <div class="tp-score ${resClass}">${myScore}–${oppScore}</div>
+      <div class="tp-result ${resClass}">${res}</div>
+    </div>`;
+  }).join('');
+
+  const body=document.getElementById('team-modal-body');
+  body.innerHTML=`
+    <div class="tp-header">
+      <div class="tp-logo" style="background:${col}22;border:2px solid ${col};color:${col}">${initials}</div>
+      <div class="tp-info">
+        <div class="tp-name">${t.name}</div>
+        <div class="tp-meta">
+          <span class="cb ${cClass(t.conf)}">Conference ${t.conf}</span>
+          <span class="cb cl${t.cls}">Class ${t.cls}</span>
+          ${streakHtml}
+        </div>
+      </div>
+    </div>
+
+    <div class="tp-rank-row">
+      <div class="tp-rank-num">#${confRank}</div>
+      <div class="tp-rank-info">
+        <strong>Conference ${t.conf} Ranking</strong>
+        ${rankLabel} out of ${confTeams.length} teams
+      </div>
+      <div style="text-align:right">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;color:var(--gold)">${pctDisp}</div>
+        <div style="font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:1px">Win %</div>
+      </div>
+    </div>
+
+    <div class="tp-record">
+      <div class="tp-stat sw"><div class="sv">${r.w}</div><div class="sl">Wins</div></div>
+      <div class="tp-stat sl2"><div class="sv">${r.l}</div><div class="sl">Losses</div></div>
+      <div class="tp-stat st"><div class="sv">${r.t}</div><div class="sl">Ties</div></div>
+      <div class="tp-stat sp"><div class="sv">${played.length}/${teamGames.length}</div><div class="sl">Played</div></div>
+      <div class="tp-stat sgf"><div class="sv">${r.gf||0}</div><div class="sl">GF</div></div>
+      <div class="tp-stat sga"><div class="sv">${r.ga||0}</div><div class="sl">GA</div></div>
+    </div>
+
+    <div class="tp-sched-title">📅 Conference Schedule & Results</div>
+    <div id="tp-games-list">${gameRows||'<p class="no-res">No games scheduled.</p>'}</div>
+  `;
+
+  document.getElementById('team-ov').classList.remove('hidden');
+}
+
+function closeTeamProfile(){
+  document.getElementById('team-ov').classList.add('hidden');
+}
+
+document.getElementById('team-ov').addEventListener('click',e=>{
+  if(e.target===document.getElementById('team-ov'))closeTeamProfile();
+});
+
+// ── FIREBASE CONFIG ───────────────────────────────────────────────────────
+// STEP: Paste your Firebase config values below.
+// Get these from: Firebase Console → Project Settings → Your Apps → Web App
+// Leave as-is if you haven't set up Firebase yet — the site still works locally.
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyDW99vtNtVRjl0JDvuujAIF-5R5OqLsUU4",
+  authDomain:        "nassau-county-glax-standings.firebaseapp.com",
+  databaseURL:       "https://nassau-county-glax-standings-default-rtdb.firebaseio.com",
+  projectId:         "nassau-county-glax-standings",
+  storageBucket:     "nassau-county-glax-standings.firebasestorage.app",
+  messagingSenderId: "826686058640",
+  appId:             "1:826686058640:web:892b22a91d6ad333f26815"
+};
+
+// ── FIREBASE STATUS BANNER ────────────────────────────────────────────────
+function setFBBanner(status){
+  const b=document.getElementById('fb-banner');
+  if(!b)return;
+  if(status==='connected'){
+    b.style.background='rgba(16,185,129,.12)';b.style.borderColor='rgba(16,185,129,.4)';b.style.color='#6ee7b7';
+    b.innerHTML='🟢 <strong>Live</strong> — scores update in real time for all visitors';
+  }else if(status==='local'){
+    b.style.background='rgba(249,115,22,.1)';b.style.borderColor='rgba(249,115,22,.35)';b.style.color='#fcd34d';
+    b.innerHTML='🟡 <strong>Local mode</strong> — Firebase not connected yet. <a href="#" onclick="openSetupGuide();return false;" style="color:inherit;font-weight:700">Click here to set up live sync →</a>';
+  }else if(status==='error'){
+    b.style.background='rgba(239,68,68,.1)';b.style.borderColor='rgba(239,68,68,.3)';b.style.color='#fca5a5';
+    b.innerHTML='🔴 <strong>Connection error</strong> — working in local mode. <a href="#" onclick="openSetupGuide();return false;" style="color:inherit;font-weight:700">Setup help →</a>';
+  }
+  b.style.display='flex';
+}
+
+// ── SETUP GUIDE MODAL ─────────────────────────────────────────────────────
+function openSetupGuide(){
+  document.getElementById('setup-ov').classList.remove('hidden');
+}
+function closeSetupGuide(){
+  document.getElementById('setup-ov').classList.add('hidden');
+}
+document.getElementById('setup-ov').addEventListener('click',e=>{
+  if(e.target===document.getElementById('setup-ov'))closeSetupGuide();
+});
+
+// ── INIT WITH FIREBASE ────────────────────────────────────────────────────
+updateTitle();initSelects();renderAll();
+
+const isFirebaseConfigured = FIREBASE_CONFIG.apiKey !== 'PASTE_YOUR_API_KEY_HERE';
+
+if(isFirebaseConfigured){
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG);
+    const db = firebase.database();
+    window._fbDB = db;
+
+    // Show connecting state
+    setFBBanner('local');
+
+    // Listen for real-time updates — fires immediately on load then on every change
+    let _fbInitialPush = false; // guard against infinite loop on first empty DB
+    db.ref('ncgl2026').on('value', snapshot => {
+      const data = snapshot.val();
+      if(data){
+        TEAMS = (data.teams && data.teams.length) ? data.teams : TEAMS;
+        buildTM();
+        state.games = mergeGames(makeSchedule(), data.games||[]);
+        state.pending = data.pending||[];
+        state.year = data.year||state.year;
+        state.archives = data.archives||[];
+        try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+        renderAll();
+        setFBBanner('connected');
+      } else if(!_fbInitialPush) {
+        // No data in Firebase yet — push local state once as the source of truth
+        // Guard prevents saveState() → Firebase write → listener → saveState() loop
+        _fbInitialPush = true;
+        saveState();
+        setFBBanner('connected');
+      }
+    }, err => {
+      console.error('Firebase listener error:', err);
+      setFBBanner('error');
+    });
+
+  }catch(e){
+    console.error('Firebase init error:', e);
+    setFBBanner('error');
+  }
+} else {
+  // Firebase not configured yet — run entirely in local mode
+  setFBBanner('local');
+}
+</script>
+</body>
+</html>
