@@ -32,10 +32,11 @@ header h1 .sub{color:var(--gold);display:block;font-size:11px;font-weight:600;le
 .blink:hover{color:var(--text)}
 .tabs{display:flex;background:var(--navy2);border-bottom:2px solid var(--border);overflow-x:auto;padding:0 12px;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
-.tab{padding:11px 15px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--gray);border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:all .2s}
+.tab{padding:11px 15px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;letter-spacing:1px;text-transform:uppercase;color:var(--gray);border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:all .2s}
 .tab:hover{color:var(--text)}
 .tab.active{color:var(--gold);border-bottom-color:var(--gold)}
 .bdg{background:var(--red);color:#fff;font-size:10px;padding:1px 5px;border-radius:8px;margin-left:4px;vertical-align:middle}
+.hdr-icon-btn{padding:8px 16px;font-size:14px;letter-spacing:.5px;border-radius:9px;font-family:'Barlow Condensed',sans-serif;font-weight:700}
 .main{padding:16px;max-width:1600px;margin:0 auto}
 .panel{display:none}.panel.active{display:block}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto}
@@ -102,6 +103,7 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
 .lc{color:var(--red);font-weight:600}
 .sn{display:inline-flex;width:19px;height:19px;border-radius:50%;background:var(--gold);color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:10px;align-items:center;justify-content:center;margin-right:4px;flex-shrink:0}
 .sn.s2{background:var(--c2);color:#fff}.sn.s3{background:var(--c3);color:#fff}.sn.s4{background:var(--c4);color:#fff}.sn.s5{background:var(--c5);color:#fff}.sn.s6{background:var(--c6);color:#fff}
+.sn.playin{background:var(--orange);color:#fff;border-radius:4px;width:auto;padding:0 5px;font-size:9px}
 .class-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
 .clsblk{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
 .clshdr{padding:9px 13px;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:14px;text-transform:uppercase;letter-spacing:1px}
@@ -407,8 +409,8 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
     <h1><span class="sub">Nassau County</span>Girls Lacrosse <span id="title-year">2026</span></h1>
   </div>
   <div class="hright">
-    <button class="btn btn-bl btn-sm" onclick="openShare()">🔗 Share</button>
-    <button class="btn btn-ol btn-sm" onclick="openArcList()">📦 Archives</button>
+    <button class="btn btn-ol hdr-icon-btn" onclick="openArcList()" title="Season Archives">📦 Archives</button>
+    <button class="btn btn-ol hdr-icon-btn" id="admin-login-btn" onclick="openAdminLoginModal()" title="Admin Login">🔐 Admin</button>
     <span id="admin-pill" style="display:none" class="upill">🔑 Admin</span>
     <button id="logout-btn" style="display:none" class="blink" onclick="adminLogout()">Logout</button>
   </div>
@@ -421,7 +423,7 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
   <div class="tab" data-tab="schedule" onclick="switchTab('schedule')">📅 Schedule</div>
   <div class="tab" data-tab="results" onclick="switchTab('results')">🏁 Recent Results</div>
   <div class="tab" data-tab="submit" onclick="switchTab('submit')">📬 Submit Score</div>
-  <div class="tab" data-tab="login" onclick="switchTab('login')">🔐 Admin Login</div>
+  <div class="tab" data-tab="login" style="display:none" onclick="switchTab('login')">🔐 Admin Login</div>
   <div class="tab" data-tab="admin" style="display:none" onclick="switchTab('admin')">⚙️ Admin <span class="bdg" id="pending-badge" style="display:none">0</span></div>
 </div>
 
@@ -432,7 +434,7 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
   <div class="leg">
     <div class="li"><div class="ld" style="background:rgba(26,86,219,.3);border:1px solid #3b82f6"></div>Conf 1 &amp; 2 — all teams qualify for playoffs</div>
     <div class="li"><div class="ld" style="background:rgba(16,185,129,.2);border:1px solid #10b981"></div>Conf 3 — fills remaining playoff bracket spots by class standing</div>
-    <div class="li"><div class="ld" style="background:rgba(245,158,11,.2);border:1px solid #f59e0b"></div>Conf 4 — conference champion per class qualifies for playoffs only</div>
+    <div class="li"><div class="ld" style="background:rgba(249,115,22,.2);border:1px solid #f97316"></div>Conf 4 — Conference Champion Qualifies for Playoffs</div>
   </div>
   <div class="ebar"><button class="btn btn-ol btn-sm" onclick="exportCSV('conf')">📊 Export to Google Sheets</button></div>
   <div class="conf-grid" id="conf-standings" style="--nc:4"></div>
@@ -440,7 +442,7 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
 
 <!-- CLASS STANDINGS -->
 <div id="panel-class" class="panel">
-  <div class="info">⚠️ <strong>Playoff seeding:</strong> Conf 1 (all) → Conf 2 (all) → Conf 3 (fills remaining spots) → Conf 4 (champion only per class). No lower-conference team can jump a higher-conference team. Ties broken by head-to-head.</div>
+  <div class="info">⚠️ <strong>Playoff seeding:</strong> Conf 1 (all) → Conf 2 (all) → Conf 3 (fills remaining spots) → Conf 4 (conference champion qualifies). No lower-conference team can jump a higher-conference team. Ties broken by head-to-head. ⭐ = Conference 4 champion (qualifies for playoffs in their class).</div>
   <div class="ebar"><button class="btn btn-ol btn-sm" onclick="exportCSV('class')">📊 Export to Google Sheets</button></div>
   <div class="class-grid" id="class-standings"></div>
 </div>
@@ -788,6 +790,13 @@ function updateTitle(){
 }
 
 // ── AUTH ───────────────────────────────────────────────────────────────────
+function openAdminLoginModal(){
+  // Switch to the hidden login panel
+  switchTab('login');
+  // Scroll to top so login form is visible
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
 function doLogin(){
   const u=document.getElementById('login-user').value.trim();
   const p=document.getElementById('login-pass').value;
@@ -796,6 +805,7 @@ function doLogin(){
     isAdmin=true;
     document.getElementById('admin-pill').style.display='flex';
     document.getElementById('logout-btn').style.display='';
+    document.getElementById('admin-login-btn').style.display='none';
     document.querySelector('[data-tab="login"]').style.display='none';
     document.querySelector('[data-tab="admin"]').style.display='';
     switchTab('admin');renderAll();showToast('Welcome, Admin!');
@@ -805,7 +815,8 @@ function adminLogout(){
   isAdmin=false;
   document.getElementById('admin-pill').style.display='none';
   document.getElementById('logout-btn').style.display='none';
-  document.querySelector('[data-tab="login"]').style.display='';
+  document.getElementById('admin-login-btn').style.display='';
+  document.querySelector('[data-tab="login"]').style.display='none';
   document.querySelector('[data-tab="admin"]').style.display='none';
   switchTab('conf');renderAll();showToast('Logged out','tw');
 }
@@ -1194,7 +1205,7 @@ function renderConfStandings(){
       <div class="chdr" style="background:${col}18;border-bottom:2px solid ${col}">
         <span class="cb ${cc}">Conf ${conf}</span>
         Conference ${conf}
-        <span style="margin-left:auto;font-size:9px;color:var(--gray)">${isAll?'✦ All qualify':isC3?'◈ Fills brackets':isChamp?'★ Champ only':''}</span>
+        <span style="margin-left:auto;font-size:9px;color:var(--gray)">${isAll?'✦ All qualify':isC3?'◈ Fills brackets':isChamp?'⭐ Conf Champ Qualifies':''}</span>
       </div>
       <table class="stbl"><thead><tr><th>Team</th><th>Cls</th><th>W</th><th>L</th><th>T</th><th>%</th></tr></thead><tbody>
       ${sorted.map((tid,idx)=>{
@@ -1214,18 +1225,23 @@ function renderClassStandings(){
   const rec=computeStandings();
   const confs=[...new Set(TEAMS.map(t=>t.conf))].sort();
   const el=document.getElementById('class-standings');el.innerHTML='';
+
+  // ONE overall Conference 4 champion — the single #1 team across ALL of conf 4
+  // This is the only team that gets the ⭐ anywhere in class standings
+  const conf4Teams=TEAMS.filter(t=>t.conf===4&&!t._ph);
+  const conf4Sorted=sortTeams(conf4Teams.map(t=>t.id),rec);
+  const overallConf4Champ=conf4Sorted.length>0?conf4Sorted[0]:null;
+
   ['A','B','C','D'].forEach(cls=>{
     const blocks=confs.map(c=>({conf:c,ids:sortTeams(TEAMS.filter(t=>t.cls===cls&&t.conf===c&&!t._ph).map(t=>t.id),rec)}));
-    // Build seeded list: conf<=2 all qualify, conf3 fills remaining (up to PLAYOFF_SPOTS), conf4+ champ only
     const spots=PLAYOFF_SPOTS[cls];
     const seeded=[];
     blocks.forEach(({conf,ids})=>{
       if(conf<=2)ids.forEach(id=>seeded.push({id,conf}));
       else if(conf===3)ids.forEach(id=>seeded.push({id,conf}));
-      else if(ids.length>0)seeded.push({id:ids[0],conf}); // champ only
     });
     const seededCapped=seeded.slice(0,spots);
-    // All teams in class
+    // All teams in class ordered by conf block — conf 4 cannot jump conf 3
     const allIds=[];blocks.forEach(({ids})=>ids.forEach(id=>allIds.push(id)));
     if(!allIds.length)return;
     const div=document.createElement('div');div.className='clsblk';
@@ -1237,10 +1253,17 @@ function renderClassStandings(){
         const si=seededCapped.findIndex(s=>s.id===tid);
         const isSeed=si>=0;
         const seed=si+1;
+        // Star only on the ONE overall conf 4 leader — appears in exactly one class table
+        const isConf4Champ=overallConf4Champ===tid;
         const sc=t.conf===1?'':` s${t.conf<=6?t.conf:1}`;
+        const seedCell=isSeed
+          ?`<span class="sn${sc}">${seed}</span>`
+          :`<span style="color:var(--gray);font-size:11px">${idx+1}</span>`;
         return`<tr ${isSeed?'class="qr"':''}>
-          <td>${isSeed?`<span class="sn${sc}">${seed}</span>`:`<span style="color:var(--gray);font-size:11px">${idx+1}</span>`}</td>
-          <td style="font-size:11px;font-weight:600"><span class="team-link" onclick="openTeamProfile('${tid}')">${t.name}</span></td>
+          <td>${seedCell}</td>
+          <td style="font-size:11px;font-weight:600">
+            <span class="team-link" onclick="openTeamProfile('${tid}')">${t.name}</span>${isConf4Champ?` <span title="Conference 4 Champion — qualifies for playoffs" style="color:var(--gold);font-size:13px">⭐</span>`:''}
+          </td>
           <td><span class="cb ${cClass(t.conf)}">C${t.conf}</span></td>
           <td class="wc">${r.w}</td><td class="lc">${r.l}</td><td class="pct">${pctStr(r)}</td>
         </tr>`;
