@@ -653,16 +653,29 @@ const DEFAULT_TEAMS=[
 ];
 
 const PLAYOFF_SPOTS={A:8,B:10,C:8,D:4};
-const SK='ncgl2026_v6';
+const SK='ncgl2026_v7';
 
 // ID migration map: old broken IDs → correct new IDs
 const ID_MIGRATION={
-  'GNN':'GN_NORTH',  // was "GNN (Garden City S.)" Class A → now Great Neck North Class B
-  'GNS':'GN_SOUTH',  // was "GNS (Great Neck S.)" Class B → now Great Neck South Class A
+  'GNN':'GN_NORTH',
+  'GNS':'GN_SOUTH',
 };
 
+// Class corrections: team IDs that had wrong class assignments in cached/Firebase data
+// These are applied whenever teams are loaded from any external source
+const CLASS_CORRECTIONS={
+  'JER': 'B',   // Jericho is Class B (was incorrectly Class A)
+  'FREE': 'A',  // Freeport is Class A (was incorrectly Class B)
+};
+
+function applyClassCorrections(teams){
+  return (teams||[]).map(t=>{
+    if(CLASS_CORRECTIONS[t.id]) return{...t,cls:CLASS_CORRECTIONS[t.id]};
+    return t;
+  });
+}
+
 function migrateGameIds(games){
-  // Rewrite any game that used old team IDs so scores are preserved
   return (games||[]).map(g=>{
     let home=ID_MIGRATION[g.home]||g.home;
     let away=ID_MIGRATION[g.away]||g.away;
@@ -672,12 +685,12 @@ function migrateGameIds(games){
 }
 
 function migrateTeams(teams){
-  // If loaded teams still have old IDs, fix them in place
-  return (teams||[]).map(t=>{
+  const migrated=(teams||[]).map(t=>{
     if(t.id==='GNN') return{...t,id:'GN_NORTH',name:'Great Neck North',cls:'B',conf:4};
     if(t.id==='GNS') return{...t,id:'GN_SOUTH',name:'Great Neck South',cls:'A',conf:4};
     return t;
   });
+  return applyClassCorrections(migrated);
 }
 
 let TEAMS=[];
@@ -719,23 +732,34 @@ function loadState(){
     }
   }catch(e){console.warn('hash:',e);}
 
-  // Try current key (v6)
+  // Try current key (v7)
   try{
     const s=localStorage.getItem(SK);
     if(s){
       const parsed=JSON.parse(s);
-      // Always use DEFAULT_TEAMS as the source of truth for team definitions,
-      // but preserve any custom teams that were added via the admin panel
       const defaultIds=new Set(DEFAULT_TEAMS.map(t=>t.id));
-      const customTeams=(parsed.teams||[]).filter(t=>!defaultIds.has(t.id)&&!defaultIds.has(ID_MIGRATION[t.id]));
+      const customTeams=applyClassCorrections((parsed.teams||[]).filter(t=>!defaultIds.has(t.id)&&!defaultIds.has(ID_MIGRATION[t.id])));
       TEAMS=[...JSON.parse(JSON.stringify(DEFAULT_TEAMS)),...customTeams];
       buildTM();
       const migratedGames=migrateGameIds(parsed.games||[]);
       return{teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:parsed.pending||[],year:parsed.year||2026,archives:parsed.archives||[]};
     }
-  }catch(e){console.warn('v6 load:',e);}
+  }catch(e){console.warn('v7 load:',e);}
 
-  // Try migrating from old v5 key — preserves all previously entered scores
+  // Migrate from v6
+  try{
+    const old=localStorage.getItem('ncgl2026_v6');
+    if(old){
+      const parsed=JSON.parse(old);
+      TEAMS=JSON.parse(JSON.stringify(DEFAULT_TEAMS));buildTM();
+      const migratedGames=migrateGameIds(parsed.games||[]);
+      const st={teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:parsed.pending||[],year:parsed.year||2026,archives:parsed.archives||[]};
+      try{localStorage.setItem(SK,JSON.stringify(st));}catch(e){}
+      return st;
+    }
+  }catch(e){console.warn('v6 migration:',e);}
+
+  // Try migrating from old v5 key
   try{
     const old=localStorage.getItem('ncgl2026_v5');
     if(old){
@@ -743,7 +767,6 @@ function loadState(){
       TEAMS=JSON.parse(JSON.stringify(DEFAULT_TEAMS));buildTM();
       const migratedGames=migrateGameIds(parsed.games||[]);
       const st={teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:parsed.pending||[],year:parsed.year||2026,archives:parsed.archives||[]};
-      // Save under new key right away
       try{localStorage.setItem(SK,JSON.stringify(st));}catch(e){}
       return st;
     }
@@ -759,7 +782,7 @@ function saveState(){
   // 1. Save locally as fallback, clear old keys
   try{
     localStorage.setItem(SK,JSON.stringify(state));
-    ['ncgl2026_v5','ncgl2026_v4','ncgl2026_v3'].forEach(k=>{try{localStorage.removeItem(k);}catch(e){}});
+    ['ncgl2026_v6','ncgl2026_v5','ncgl2026_v4','ncgl2026_v3'].forEach(k=>{try{localStorage.removeItem(k);}catch(e){}});
   }catch(e){console.error(e);}
   // 2. Save to Firebase so ALL visitors see updates instantly
   if(window._fbDB){
@@ -1637,18 +1660,27 @@ if(isFirebaseConfigured){
     db.ref('ncgl2026').on('value', snapshot => {
       const data = snapshot.val();
       if(data){
-        TEAMS = (data.teams && data.teams.length) ? data.teams : TEAMS;
+        // Always use DEFAULT_TEAMS as source of truth for team definitions
+        // Apply class corrections to any stale data coming from Firebase
+        const fbTeams = applyClassCorrections(migrateTeams(data.teams||[]));
+        const defaultIds = new Set(DEFAULT_TEAMS.map(t=>t.id));
+        const customTeams = fbTeams.filter(t=>!defaultIds.has(t.id));
+        TEAMS = [...JSON.parse(JSON.stringify(DEFAULT_TEAMS)), ...customTeams];
         buildTM();
-        state.games = mergeGames(makeSchedule(), data.games||[]);
+        state.games = mergeGames(makeSchedule(), migrateGameIds(data.games||[]));
         state.pending = data.pending||[];
         state.year = data.year||state.year;
         state.archives = data.archives||[];
         try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
         renderAll();
         setFBBanner('connected');
+        // If Firebase still has stale team classes, push the corrected data back up once
+        const fbJer = (data.teams||[]).find(t=>t.id==='JER');
+        const fbFree = (data.teams||[]).find(t=>t.id==='FREE');
+        if((fbJer&&fbJer.cls!=='B')||(fbFree&&fbFree.cls!=='A')){
+          saveState(); // push corrected team data back to Firebase for all visitors
+        }
       } else if(!_fbInitialPush) {
-        // No data in Firebase yet — push local state once as the source of truth
-        // Guard prevents saveState() → Firebase write → listener → saveState() loop
         _fbInitialPush = true;
         saveState();
         setFBBanner('connected');
