@@ -473,13 +473,14 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
 <div id="panel-submit" class="panel">
   <div class="scard" style="max-width:540px;margin:0 auto">
     <h2>📬 Submit a Score (Coach)</h2>
-    <p style="font-size:13px;color:var(--gray);margin-bottom:13px">Scores submitted here go to admin for review before appearing in standings.</p>
+    <p style="font-size:13px;color:var(--gray);margin-bottom:13px">Conference games only. Select your home team first — the away team list will automatically show only teams in the same conference.</p>
     <div class="fg"><label>Your Email Address *</label><input type="email" id="sub-email" placeholder="coach@school.edu"></div>
     <div class="fr">
-      <div class="fg"><label>Home Team</label><select id="sub-home" onchange="checkSubGame()"></select></div>
+      <div class="fg"><label>Home Team</label><select id="sub-home" onchange="onSubHomeChange();checkSubGame()"></select></div>
       <div class="vsl">VS</div>
-      <div class="fg"><label>Away Team</label><select id="sub-away" onchange="checkSubGame()"></select></div>
+      <div class="fg"><label>Away Team (same conf)</label><select id="sub-away" onchange="checkSubGame()" disabled style="opacity:0.6"></select></div>
     </div>
+    <div id="sub-conf-label" style="font-size:12px;font-weight:700;color:var(--blue-lt);margin:-2px 0 8px;letter-spacing:.5px"></div>
     <div class="fr" style="margin-top:4px">
       <div class="fg"><label id="sub-hl">Home Score</label><input type="number" id="sub-hs" min="0" value="0"></div>
       <div class="vsl">–</div>
@@ -517,11 +518,13 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
   <div class="asub active" id="asub-scores">
     <div class="stitle">⚽ Enter / Edit Result</div>
     <div class="scard" style="max-width:580px">
+      <div style="font-size:12px;color:var(--gray);margin-bottom:10px">⚠️ Conference games only — select a home team to load that conference's away teams.</div>
       <div class="fr">
-        <div class="fg"><label>Home Team</label><select id="adm-home" onchange="checkAdminGame()"></select></div>
+        <div class="fg"><label>Home Team</label><select id="adm-home" onchange="onAdmHomeChange();checkAdminGame()"></select></div>
         <div class="vsl">VS</div>
-        <div class="fg"><label>Away Team</label><select id="adm-away" onchange="checkAdminGame()"></select></div>
+        <div class="fg"><label>Away Team (same conf)</label><select id="adm-away" onchange="checkAdminGame()" disabled style="opacity:0.6"></select></div>
       </div>
+      <div id="adm-conf-label" style="font-size:12px;font-weight:700;color:var(--blue-lt);margin:-2px 0 8px;letter-spacing:.5px"></div>
       <div class="fr" style="margin-top:5px">
         <div class="fg"><label id="adm-hl">Home Score</label><input type="number" id="adm-hs" min="0" value="0"></div>
         <div class="vsl">–</div>
@@ -880,21 +883,43 @@ function pctStr(r){const g=r.w+r.l+r.t;return g>0?(r.w/g).toFixed(3).replace(/^0
 function cColor(c){return['#f59e0b','#3b82f6','#10b981','#a855f7','#ec4899','#06b6d4'][(c-1)%6];}
 function cClass(c){return c<=6?`c${c}`:'c1';}
 
-// ── SELECTS ───────────────────────────────────────────────────────────────
-function populateSelect(id){
-  const sel=document.getElementById(id);if(!sel)return;
+// ── SELECTS — conference-locked: away only shows same-conference teams ────
+function populateHomeSelect(selId){
+  const sel=document.getElementById(selId);if(!sel)return;
   const confs=[...new Set(TEAMS.map(t=>t.conf))].sort();
-  sel.innerHTML='';
+  sel.innerHTML='<option value="">— Select Home Team —</option>';
   confs.forEach(c=>{
     const g=document.createElement('optgroup');g.label=`Conference ${c}`;
-    TEAMS.filter(t=>t.conf===c&&!t._ph).forEach(t=>{const o=document.createElement('option');o.value=t.id;o.textContent=t.name;g.appendChild(o);});
+    TEAMS.filter(t=>t.conf===c&&!t._ph).forEach(t=>{
+      const o=document.createElement('option');o.value=t.id;o.textContent=t.name;g.appendChild(o);
+    });
     sel.appendChild(g);
   });
 }
+
+function populateAwaySelect(selId,conf){
+  // Filters away dropdown to ONLY teams in the same conference as the home team
+  const sel=document.getElementById(selId);if(!sel)return;
+  const prev=sel.value;
+  sel.innerHTML='<option value="">— Select Away Team —</option>';
+  if(!conf){sel.disabled=true;sel.title='Select a home team first';return;}
+  sel.disabled=false;sel.title='';
+  const teams=TEAMS.filter(t=>t.conf===conf&&!t._ph);
+  teams.forEach(t=>{
+    const o=document.createElement('option');o.value=t.id;o.textContent=t.name;sel.appendChild(o);
+  });
+  // Restore previous selection if still valid
+  if(prev&&teams.find(t=>t.id===prev))sel.value=prev;
+}
+
 function initSelects(){
-  ['adm-home','adm-away','sub-home','sub-away'].forEach(id=>populateSelect(id));
-  try{document.getElementById('adm-away').selectedIndex=1;}catch(e){}
-  try{document.getElementById('sub-away').selectedIndex=1;}catch(e){}
+  // Home selects show all teams grouped by conference
+  populateHomeSelect('adm-home');
+  populateHomeSelect('sub-home');
+  // Away selects start disabled until a home team is chosen
+  populateAwaySelect('adm-away',null);
+  populateAwaySelect('sub-away',null);
+
   const confs=[...new Set(TEAMS.map(t=>t.conf))].sort();
   // schedule filter conf buttons
   const fb=document.getElementById('sched-fbar');
@@ -913,19 +938,41 @@ function initSelects(){
 }
 
 // ── ADMIN GAME CHECK ──────────────────────────────────────────────────────
+function onAdmHomeChange(){
+  const hId=document.getElementById('adm-home').value;
+  const ew=document.getElementById('adm-err'),ex=document.getElementById('adm-exist');
+  ew.style.display='none';ex.style.display='none';
+  if(!hId||!TM[hId]){
+    populateAwaySelect('adm-away',null);
+    document.getElementById('adm-conf-label').textContent='';
+    return;
+  }
+  const conf=TM[hId].conf;
+  // Rebuild away dropdown with ONLY same-conference teams
+  populateAwaySelect('adm-away',conf);
+  document.getElementById('adm-conf-label').textContent=`Conference ${conf} game`;
+  document.getElementById('adm-hl').textContent=TM[hId].name+' Score';
+  document.getElementById('adm-al').textContent='Away Score';
+  document.getElementById('adm-hs').value=0;
+  document.getElementById('adm-as').value=0;
+}
+
 function checkAdminGame(){
   const hId=document.getElementById('adm-home').value,aId=document.getElementById('adm-away').value;
   const ew=document.getElementById('adm-err'),ex=document.getElementById('adm-exist');
   ew.style.display='none';ex.style.display='none';
   if(!hId||!aId||hId===aId||!TM[hId]||!TM[aId])return;
-  if(TM[hId].conf!==TM[aId].conf){ew.textContent='These teams are in different conferences.';ew.style.display='block';return;}
+  // Belt-and-suspenders check — away dropdown is already filtered but double-check
+  if(TM[hId].conf!==TM[aId].conf){
+    ew.textContent='⛔ Cross-conference games cannot be entered. This is a conference-only schedule.';
+    ew.style.display='block';return;
+  }
   document.getElementById('adm-hl').textContent=TM[hId].name+' Score';
   document.getElementById('adm-al').textContent=TM[aId].name+' Score';
   const g=findGame(hId,aId);
   if(g&&g.played){
     const hs=g.home===hId?g.homeScore:g.awayScore;
     const as=g.home===hId?g.awayScore:g.homeScore;
-    // Show existing result with duplicate warning — pre-fill scores for easy editing
     ex.innerHTML=`🚫 <strong>Game already has a result:</strong> ${TM[hId].name} ${hs}–${as} ${TM[aId].name} &nbsp;·&nbsp; Teams play each other once. Use <strong>✏️ Edit</strong> in Recent Results to correct it.`;
     ex.style.background='rgba(239,68,68,.1)';
     ex.style.border='1px solid rgba(239,68,68,.3)';
@@ -941,6 +988,22 @@ function checkAdminGame(){
     document.getElementById('adm-as').value=0;
   }
 }
+
+function onSubHomeChange(){
+  const hId=document.getElementById('sub-home').value;
+  document.getElementById('sub-err').style.display='none';
+  if(!hId||!TM[hId]){
+    populateAwaySelect('sub-away',null);
+    document.getElementById('sub-conf-label').textContent='';
+    return;
+  }
+  const conf=TM[hId].conf;
+  populateAwaySelect('sub-away',conf);
+  document.getElementById('sub-conf-label').textContent=`Conference ${conf} game`;
+  document.getElementById('sub-hl').textContent=TM[hId].name+' Score';
+  document.getElementById('sub-al').textContent='Away Score';
+}
+
 function checkSubGame(){
   const h=document.getElementById('sub-home').value,a=document.getElementById('sub-away').value;
   if(h&&TM[h])document.getElementById('sub-hl').textContent=TM[h].name+' Score';
