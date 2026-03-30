@@ -546,8 +546,19 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
 
   <!-- CONFERENCES & TEAMS -->
   <div class="asub" id="asub-conferences">
-    <div class="stitle">🏟 Conference &amp; Team Management</div>
-    <div class="info">Changes take effect immediately. Rebuilds the schedule while preserving all existing scores.</div>
+    <div class="stitle">🏟 New Season Setup — Conferences, Teams &amp; Playoff Spots</div>
+    <div class="info">Use this section to configure each new season. Changes take effect immediately and rebuild the schedule while preserving all existing scores.</div>
+
+    <!-- PLAYOFF QUALIFIERS EDITOR -->
+    <div style="background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:18px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;color:var(--gold)">🏆 Playoff Qualifiers Per Class</div>
+      <p style="font-size:12px;color:var(--gray);margin-bottom:14px">Set how many teams qualify for playoffs in each class. Update these before the season starts if classifications change year to year.</p>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px" id="playoff-spots-editor">
+        <!-- Rendered by renderPlayoffSpotsEditor() -->
+      </div>
+    </div>
+
+    <!-- CONFERENCE COUNT -->
     <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:15px;flex-wrap:wrap">
       <div class="fg" style="margin:0">
         <label>Number of Conferences</label>
@@ -576,7 +587,7 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
   <!-- ARCHIVE -->
   <div class="asub" id="asub-archive">
     <div class="stitle">📦 Archive &amp; New Season</div>
-    <div class="wbox">⚠️ <strong>Archiving saves all current standings, then resets scores for a fresh season.</strong> The year in the title advances by 1. This cannot be undone.</div>
+    <div class="wbox">⚠️ <strong>Archiving saves all current standings, then resets scores for a fresh season.</strong> The year in the title advances by 1. If archived by mistake, use the <strong>🔄 Restore</strong> button below to undo it.</div>
     <div class="scard" style="max-width:480px">
       <h2>Archive <span id="arc-yr">2026</span> Season</h2>
       <p style="font-size:13px;color:var(--gray);margin-bottom:12px">
@@ -591,7 +602,9 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
       <button class="btn btn-w" onclick="archiveSeason()" style="width:100%;margin-top:7px">📦 Archive &amp; Start New Season</button>
     </div>
     <div class="dvd"></div>
-    <div class="stitle">Previous Archives</div>
+    <div class="stitle">Previous Archives
+      <span style="font-size:11px;font-weight:400;color:var(--gray);text-transform:none;letter-spacing:0;margin-left:8px">Click 🔄 Restore to make an archived season the active live season again</span>
+    </div>
     <div id="arc-list-admin"></div>
   </div>
 </div>
@@ -655,7 +668,9 @@ const DEFAULT_TEAMS=[
   {id:'ROOS',name:'Roosevelt',conf:4,cls:'B'},
 ];
 
-const PLAYOFF_SPOTS={A:8,B:10,C:8,D:4};
+// PLAYOFF_SPOTS — stored in state so admin can edit per season. Defaults shown below.
+const DEFAULT_PLAYOFF_SPOTS={A:8,B:10,C:8,D:4};
+// PLAYOFF_SPOTS is set from state after loadState() runs (see below)
 const SK='ncgl2026_v7';
 
 // ID migration map: old broken IDs → correct new IDs
@@ -728,7 +743,7 @@ function loadState(){
       const migratedTeams=migrateTeams(parsed.teams||JSON.parse(JSON.stringify(DEFAULT_TEAMS)));
       TEAMS=migratedTeams;buildTM();
       const migratedGames=migrateGameIds(parsed.games||[]);
-      const st={teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:[],year:parsed.year||2026,archives:parsed.archives||[]};
+      const st={teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:[],year:parsed.year||2026,archives:parsed.archives||[],playoffSpots:parsed.playoffSpots||{...DEFAULT_PLAYOFF_SPOTS}};
       try{localStorage.setItem(SK,JSON.stringify(st));}catch(e){}
       history.replaceState(null,'',location.pathname+location.search);
       return st;
@@ -745,7 +760,7 @@ function loadState(){
       TEAMS=[...JSON.parse(JSON.stringify(DEFAULT_TEAMS)),...customTeams];
       buildTM();
       const migratedGames=migrateGameIds(parsed.games||[]);
-      return{teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:parsed.pending||[],year:parsed.year||2026,archives:parsed.archives||[]};
+      return{teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:parsed.pending||[],year:parsed.year||2026,archives:parsed.archives||[],playoffSpots:parsed.playoffSpots||{...DEFAULT_PLAYOFF_SPOTS}};
     }
   }catch(e){console.warn('v7 load:',e);}
 
@@ -756,7 +771,7 @@ function loadState(){
       const parsed=JSON.parse(old);
       TEAMS=JSON.parse(JSON.stringify(DEFAULT_TEAMS));buildTM();
       const migratedGames=migrateGameIds(parsed.games||[]);
-      const st={teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:parsed.pending||[],year:parsed.year||2026,archives:parsed.archives||[]};
+      const st={teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:parsed.pending||[],year:parsed.year||2026,archives:parsed.archives||[],playoffSpots:parsed.playoffSpots||{...DEFAULT_PLAYOFF_SPOTS}};
       try{localStorage.setItem(SK,JSON.stringify(st));}catch(e){}
       return st;
     }
@@ -769,7 +784,7 @@ function loadState(){
       const parsed=JSON.parse(old);
       TEAMS=JSON.parse(JSON.stringify(DEFAULT_TEAMS));buildTM();
       const migratedGames=migrateGameIds(parsed.games||[]);
-      const st={teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:parsed.pending||[],year:parsed.year||2026,archives:parsed.archives||[]};
+      const st={teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:parsed.pending||[],year:parsed.year||2026,archives:parsed.archives||[],playoffSpots:parsed.playoffSpots||{...DEFAULT_PLAYOFF_SPOTS}};
       try{localStorage.setItem(SK,JSON.stringify(st));}catch(e){}
       return st;
     }
@@ -777,7 +792,7 @@ function loadState(){
 
   // Fresh start
   TEAMS=JSON.parse(JSON.stringify(DEFAULT_TEAMS));buildTM();
-  return{teams:TEAMS,games:makeSchedule(),pending:[],year:2026,archives:[]};
+  return{teams:TEAMS,games:makeSchedule(),pending:[],year:2026,archives:[],playoffSpots:{...DEFAULT_PLAYOFF_SPOTS}};
 }
 
 function saveState(){
@@ -794,7 +809,8 @@ function saveState(){
       teams:TEAMS.filter(t=>!t._ph),
       pending:state.pending||[],
       year:state.year||2026,
-      archives:state.archives||[]
+      archives:state.archives||[],
+      playoffSpots:state.playoffSpots||DEFAULT_PLAYOFF_SPOTS
     }).catch(e=>console.error('Firebase save error:',e));
   }
 }
@@ -803,6 +819,10 @@ let state=loadState();
 let isAdmin=false,editGameId=null,schedFilter='all';
 if(!state.pending)state.pending=[];
 if(!state.archives)state.archives=[];
+if(!state.playoffSpots)state.playoffSpots={...DEFAULT_PLAYOFF_SPOTS};
+
+// Live reference — always read from state so admin edits take effect immediately
+let PLAYOFF_SPOTS=state.playoffSpots;
 
 // ── TITLE ──────────────────────────────────────────────────────────────────
 function updateTitle(){
@@ -1158,7 +1178,38 @@ function rebuildSchedule(){
   state.games=mergeGames(makeSchedule(),Object.values(old));
 }
 
+function renderPlayoffSpotsEditor(){
+  const el=document.getElementById('playoff-spots-editor');if(!el)return;
+  const spots=state.playoffSpots||DEFAULT_PLAYOFF_SPOTS;
+  const clsColors={A:'var(--cA)',B:'var(--cB)',C:'var(--cC)',D:'var(--cD)'};
+  const clsTeamCounts={};
+  ['A','B','C','D'].forEach(cls=>{
+    clsTeamCounts[cls]=TEAMS.filter(t=>!t._ph&&t.cls===cls).length;
+  });
+  el.innerHTML=['A','B','C','D'].map(cls=>`
+    <div style="background:var(--navy);border:1px solid var(--border);border-radius:9px;padding:13px;text-align:center">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:18px;color:${clsColors[cls]};margin-bottom:4px">Class ${cls}</div>
+      <div style="font-size:11px;color:var(--gray);margin-bottom:10px">${clsTeamCounts[cls]} teams total</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px">
+        <button onclick="adjustSpot('${cls}',-1)" style="width:28px;height:28px;border-radius:6px;background:var(--border);border:none;color:var(--text);font-size:18px;cursor:pointer;font-weight:700;display:flex;align-items:center;justify-content:center">−</button>
+        <input type="number" id="ps-${cls}" value="${spots[cls]||DEFAULT_PLAYOFF_SPOTS[cls]}" min="1" max="30"
+          style="width:52px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;color:var(--gold);background:transparent;border:none;padding:0"
+          onchange="updatePlayoffSpot('${cls}',this.value)">
+        <button onclick="adjustSpot('${cls}',1)" style="width:28px;height:28px;border-radius:6px;background:var(--border);border:none;color:var(--text);font-size:18px;cursor:pointer;font-weight:700;display:flex;align-items:center;justify-content:center">+</button>
+      </div>
+      <div style="font-size:10px;color:var(--gray);margin-top:6px;text-transform:uppercase;letter-spacing:1px">Qualify for playoffs</div>
+    </div>`).join('');
+}
+
+function adjustSpot(cls,delta){
+  const cur=state.playoffSpots[cls]||DEFAULT_PLAYOFF_SPOTS[cls];
+  const next=Math.max(1,Math.min(30,cur+delta));
+  document.getElementById('ps-'+cls).value=next;
+  updatePlayoffSpot(cls,next);
+}
+
 function renderConfMgr(){
+  renderPlayoffSpotsEditor();
   const confs=[...new Set(TEAMS.map(t=>t.conf))].sort();
   const cc=document.getElementById('conf-counts');
   if(cc)cc.textContent=confs.map(c=>`C${c}: ${TEAMS.filter(t=>t.conf===c&&!t._ph).length}`).join(' · ');
@@ -1189,6 +1240,15 @@ function renderConfMgr(){
 }
 
 // ── ARCHIVE ───────────────────────────────────────────────────────────────
+function updatePlayoffSpot(cls,val){
+  const n=parseInt(val);
+  if(isNaN(n)||n<1||n>30){showToast('Enter a number between 1 and 30','tw');return;}
+  state.playoffSpots[cls]=n;
+  PLAYOFF_SPOTS=state.playoffSpots;
+  saveState();renderAll();renderConfMgr();
+  showToast(`✓ Class ${cls} playoff spots updated to ${n}`);
+}
+
 function archiveSeason(){
   const year=state.year||2026;
   const input=document.getElementById('arc-confirm').value.trim();
@@ -1197,12 +1257,17 @@ function archiveSeason(){
   const played=state.games.filter(g=>g.played);
   if(played.length===0&&!confirm('No games played yet. Archive anyway?'))return;
   state.archives=state.archives||[];
-  state.archives.unshift({year,archivedAt:Date.now(),teams:JSON.parse(JSON.stringify(TEAMS.filter(t=>!t._ph))),games:JSON.parse(JSON.stringify(played)),gamesPlayed:played.length});
+  state.archives.unshift({year,archivedAt:Date.now(),teams:JSON.parse(JSON.stringify(TEAMS.filter(t=>!t._ph))),games:JSON.parse(JSON.stringify(played)),gamesPlayed:played.length,playoffSpots:JSON.parse(JSON.stringify(state.playoffSpots||DEFAULT_PLAYOFF_SPOTS))});
   state.year=year+1;state.pending=[];
   TEAMS=TEAMS.filter(t=>!t._ph);buildTM();state.games=makeSchedule();
   saveState();updateTitle();renderAll();renderArcListAdmin();
   document.getElementById('arc-confirm').value='';
-  showToast(`✓ ${year} archived! Season ${year+1} started.`);
+  showToast(`✓ ${year} archived! Configure the new ${year+1} season below.`);
+  // Redirect admin to Conferences & Teams to set up the new season
+  setTimeout(()=>{
+    switchAdminSub('conferences',document.querySelector('.anb[onclick*="conferences"]'));
+    renderConfMgr();
+  },300);
 }
 
 function renderArcListAdmin(){
@@ -1213,11 +1278,75 @@ function renderArcListAdmin(){
     <div class="arccard">
       <div class="ay">${a.year}</div>
       <div class="am">${a.gamesPlayed} games played · Archived ${new Date(a.archivedAt).toLocaleDateString()}</div>
-      <button class="btn btn-bl btn-sm" onclick="viewArchive(${i})">📋 View</button>
+      <div style="display:flex;gap:7px;flex-shrink:0">
+        <button class="btn btn-bl btn-sm" onclick="viewArchive(${i})">📋 View</button>
+        <button class="btn btn-ok btn-sm" onclick="restoreArchive(${i})" title="Restore this season as the active live season">🔄 Restore</button>
+      </div>
     </div>`).join('');
 }
 
-function openArcList(){
+function restoreArchive(idx){
+  const a=state.archives[idx];
+  if(!a){showToast('Archive not found','te');return;}
+
+  const confirmMsg=`🔄 Restore ${a.year} Season?\n\n`+
+    `This will:\n`+
+    `• Bring back all ${a.gamesPlayed} results from ${a.year} as the LIVE season\n`+
+    `• Save the current live season (${state.year}) into archives so nothing is lost\n`+
+    `• Change the site title back to "Girls Lacrosse ${a.year}"\n\n`+
+    `The current ${state.year} season will be safely archived and can be restored again later.\n\n`+
+    `Type OK to confirm.`;
+
+  const input=prompt(confirmMsg);
+  if(!input||input.trim().toUpperCase()!=='OK'){
+    showToast('Restore cancelled','tw');
+    return;
+  }
+
+  // Save the current live season into archives first (so nothing is lost)
+  const currentPlayed=state.games.filter(g=>g.played);
+  const currentSnapshot={
+    year:state.year,
+    archivedAt:Date.now(),
+    teams:JSON.parse(JSON.stringify(TEAMS.filter(t=>!t._ph))),
+    games:JSON.parse(JSON.stringify(currentPlayed)),
+    gamesPlayed:currentPlayed.length,
+    _autoArchived:true  // flag: was auto-archived during a restore
+  };
+
+  // Remove the archive being restored from the archives array
+  const remainingArchives=state.archives.filter((_,i)=>i!==idx);
+
+  // Insert the current season snapshot into archives
+  remainingArchives.unshift(currentSnapshot);
+
+  // Restore the archived season as the live state
+  TEAMS=JSON.parse(JSON.stringify(a.teams||[]));
+  applyClassCorrections(TEAMS);
+  buildTM();
+
+  // Rebuild the full schedule and merge in the archived game results
+  const freshGames=makeSchedule();
+  const savedMap={};
+  (a.games||[]).forEach(g=>{if(g.played)savedMap[g.id]=g;});
+  freshGames.forEach(g=>{
+    if(savedMap[g.id]){g.played=true;g.homeScore=savedMap[g.id].homeScore;g.awayScore=savedMap[g.id].awayScore;}
+  });
+
+  state.year=a.year;
+  state.games=freshGames;
+  state.pending=[];
+  state.archives=remainingArchives;
+  state.playoffSpots=a.playoffSpots||{...DEFAULT_PLAYOFF_SPOTS};
+  PLAYOFF_SPOTS=state.playoffSpots;
+
+  saveState();
+  updateTitle();
+  renderAll();
+  renderArcListAdmin();
+  showToast(`✓ ${a.year} season restored! The site is now live with ${a.gamesPlayed} results.`);
+  switchAdminSub('archive',document.querySelector('.anb[onclick*="archive"]'));
+}
   const arcs=state.archives||[];
   const body=document.getElementById('arc-modal-body');
   document.getElementById('arc-modal-title').textContent='📦 Season Archives';
@@ -1734,6 +1863,7 @@ if(isFirebaseConfigured){
         state.pending = data.pending||[];
         state.year = data.year||state.year;
         state.archives = data.archives||[];
+        if(data.playoffSpots){state.playoffSpots=data.playoffSpots;PLAYOFF_SPOTS=state.playoffSpots;}
         try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
         renderAll();
         setFBBanner('connected');
