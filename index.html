@@ -409,7 +409,7 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
   </div>
   <div class="hright">
     <button class="btn btn-ol hdr-icon-btn" onclick="openArcList()" title="Season Archives">📦 Archives</button>
-    <button class="btn btn-ol hdr-icon-btn" id="admin-login-btn" onclick="openAdminLoginModal()" title="Admin Login">🔐 Admin</button>
+    <button class="btn btn-ol hdr-icon-btn" id="admin-login-btn" onclick="openAdminLoginModal()" title="Admin Login — click to log in">🔐 Admin<span id="hdr-pending-bubble" style="display:none;background:var(--red);color:#fff;font-size:10px;font-weight:900;padding:1px 6px;border-radius:10px;margin-left:6px;vertical-align:middle;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px">0</span></button>
     <span id="admin-pill" style="display:none" class="upill">🔑 Admin</span>
     <button id="logout-btn" style="display:none" class="blink" onclick="adminLogout()">Logout</button>
   </div>
@@ -1084,6 +1084,32 @@ function coachSubmit(){
   if(!hId||!aId||hId===aId){ew.textContent='Select two different teams.';ew.style.display='block';return;}
   if(!TM[hId]||!TM[aId]){ew.textContent='Team not found.';ew.style.display='block';return;}
   if(TM[hId].conf!==TM[aId].conf){ew.textContent='Teams must be in the same conference.';ew.style.display='block';return;}
+
+  // Block if a score has already been officially entered for this game
+  const existingGame=findGame(hId,aId);
+  if(existingGame&&existingGame.played){
+    const isHome=existingGame.home===hId;
+    const myScore=isHome?existingGame.homeScore:existingGame.awayScore;
+    const oppScore=isHome?existingGame.awayScore:existingGame.homeScore;
+    ew.innerHTML=`⛔ <strong>This score has already been submitted and approved.</strong><br>
+    ${TM[hId].name} ${myScore}–${oppScore} ${TM[aId].name} is already in the standings.<br>
+    <span style="font-size:11px;color:var(--gray)">If this result is incorrect, please contact the administrator directly.</span>`;
+    ew.style.display='block';
+    return;
+  }
+
+  // Block if this game is already waiting for admin approval in the pending queue
+  const alreadyPending=state.pending.find(p=>
+    (p.homeId===hId&&p.awayId===aId)||(p.homeId===aId&&p.awayId===hId)
+  );
+  if(alreadyPending){
+    ew.innerHTML=`⏳ <strong>This score has already been submitted and is awaiting admin approval.</strong><br>
+    ${TM[hId].name} vs ${TM[aId].name} is already in the review queue.<br>
+    <span style="font-size:11px;color:var(--gray)">Please wait for the administrator to approve or decline the existing submission.</span>`;
+    ew.style.display='block';
+    return;
+  }
+
   state.pending.push({homeId:hId,awayId:aId,homeScore:hs,awayScore:as,email,notes,ts:Date.now()});
   saveState();renderAll();
   document.getElementById('sub-email').value='';
@@ -1519,12 +1545,25 @@ function renderSchedule(){
 }
 
 // ── RENDER: ADMIN PANEL ───────────────────────────────────────────────────
+// ── PENDING BUBBLE (visible to everyone, updates header Admin button) ────────
+function updatePendingBubble(){
+  const cnt=state.pending.length;
+  const bubble=document.getElementById('hdr-pending-bubble');
+  if(bubble){
+    bubble.textContent=cnt;
+    bubble.style.display=cnt>0?'inline-block':'none';
+  }
+  // Also update tab badge and sub-tab badge if admin is logged in
+  ['pending-badge','psub-bdg'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.textContent=cnt;el.style.display=cnt>0?'':'none';}
+  });
+}
+
 function renderAdminPanel(){
   if(!isAdmin)return;
   const cnt=state.pending.length;
-  ['pending-badge','psub-bdg'].forEach(id=>{
-    const el=document.getElementById(id);if(el){el.textContent=cnt;el.style.display=cnt>0?'':'none';}
-  });
+  updatePendingBubble();
   // pending list
   const pl=document.getElementById('pending-list');
   if(!cnt){pl.innerHTML='<p class="no-res">No pending submissions.</p>';}
@@ -1599,6 +1638,7 @@ function renderResults(){
 
 function renderAll(){
   renderConfStandings();renderClassStandings();renderSchedule();renderResults();
+  updatePendingBubble();
   if(isAdmin)renderAdminPanel();
   updateTitle();initSelects();
 }
