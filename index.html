@@ -1347,6 +1347,8 @@ function restoreArchive(idx){
   showToast(`✓ ${a.year} season restored! The site is now live with ${a.gamesPlayed} results.`);
   switchAdminSub('archive',document.querySelector('.anb[onclick*="archive"]'));
 }
+
+function openArcList(){
   const arcs=state.archives||[];
   const body=document.getElementById('arc-modal-body');
   document.getElementById('arc-modal-title').textContent='📦 Season Archives';
