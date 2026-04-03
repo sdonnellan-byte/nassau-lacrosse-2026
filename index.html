@@ -1449,13 +1449,14 @@ function renderConfStandings(){
         Conference ${conf}
         <span style="margin-left:auto;font-size:9px;color:var(--gray)">${isAll?'✦ All qualify':isC3?'◈ Fills brackets':isChamp?'⭐ Conf Champ Qualifies':''}</span>
       </div>
-      <table class="stbl"><thead><tr><th>Team</th><th>Cls</th><th>W</th><th>L</th><th>T</th><th>%</th></tr></thead><tbody>
+      <table class="stbl"><thead><tr><th>Team</th><th>Cls</th><th>W</th><th>L</th><th>T</th><th>%</th><th>GF</th><th>GA</th></tr></thead><tbody>
       ${sorted.map((tid,idx)=>{
         const r=rec[tid],t=TM[tid];if(!r||!t)return'';
         const rc=isAll?'qr':isChamp&&idx===0?'cr':'';
         return`<tr class="${rc}"><td><span class="rnk">${idx+1}</span><span class="team-link" onclick="openTeamProfile('${tid}')">${t.name}</span></td>
           <td><span class="cb cl${t.cls}">${t.cls}</span></td>
-          <td class="wc">${r.w}</td><td class="lc">${r.l}</td><td>${r.t}</td><td class="pct">${pctStr(r)}</td></tr>`;
+          <td class="wc">${r.w}</td><td class="lc">${r.l}</td><td>${r.t}</td><td class="pct">${pctStr(r)}</td>
+          <td style="color:#38bdf8;font-weight:600">${r.gf||0}</td><td style="color:#fb923c;font-weight:600">${r.ga||0}</td></tr>`;
       }).join('')}
       </tbody></table>`;
     el.appendChild(div);
