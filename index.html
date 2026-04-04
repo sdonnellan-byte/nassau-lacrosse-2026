@@ -1856,12 +1856,19 @@ function renderBracket(cls){
   return html;
 }
 
-function renderPlayoffsTab(){
+function adminPreviewBracket(cls){
+  // Switch to playoffs tab and force show filled bracket even if not yet public
+  switchTab('playoffs');
+  renderPlayoffsTab(cls); // pass cls to highlight/scroll to that class
+  window.scrollTo({top:0,behavior:'smooth'});
+  showToast(`Previewing Class ${cls} bracket (admin view — not yet public unless toggled Live)`);
+}
+
+function renderPlayoffsTab(highlightCls){
   const el=document.getElementById('playoffs-content');if(!el)return;
   initBrackets();
   const year=state.year||2026;
   const clsColors={A:'var(--cA)',B:'var(--cB)',C:'var(--cC)',D:'var(--cD)'};
-  const clsNames={A:'Class A',B:'Class B',C:'Class C',D:'Class D'};
 
   let html=`<div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;text-transform:uppercase;letter-spacing:2px;color:var(--gold);margin-bottom:6px;text-align:center">Nassau County ${year} Playoff Brackets</div>`;
   html+=`<p style="text-align:center;font-size:13px;color:var(--gray);margin-bottom:24px">Playoff brackets will be published here when available.</p>`;
@@ -1869,13 +1876,18 @@ function renderPlayoffsTab(){
   ['A','B','C','D'].forEach(cls=>{
     const cfg=state.brackets[cls];
     const col=clsColors[cls];
-    html+=`<div style="margin-bottom:32px">
-      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:17px;text-transform:uppercase;letter-spacing:1px;color:${col};margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid ${col}">Nassau County Class "${cls}" Playoff Bracket</div>`;
-    if(cfg&&cfg.visible&&cfg.slots&&cfg.slots.length){
-      // Admin has published this bracket — show filled bracket
+    const isHighlight=highlightCls===cls;
+    // Admin sees filled bracket for any class that has slots (preview mode)
+    // Public sees filled bracket only when visible=true
+    const showFilled=cfg&&cfg.slots&&cfg.slots.length&&(isAdmin||(cfg.visible));
+    html+=`<div style="margin-bottom:32px${isHighlight?';outline:2px solid '+col+';outline-offset:6px;border-radius:8px;padding:8px':''}">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:17px;text-transform:uppercase;letter-spacing:1px;color:${col};margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid ${col};display:flex;align-items:center;gap:10px">
+        Nassau County Class "${cls}" Playoff Bracket
+        ${isAdmin&&cfg&&cfg.visible?`<span style="font-size:11px;background:rgba(16,185,129,.2);color:var(--green);padding:2px 8px;border-radius:10px;font-weight:700">● LIVE</span>`:isAdmin&&cfg&&cfg.slots&&cfg.slots.length?`<span style="font-size:11px;background:rgba(249,115,22,.15);color:var(--orange);padding:2px 8px;border-radius:10px;font-weight:700">Admin Preview</span>`:''}
+      </div>`;
+    if(showFilled){
       html+=renderBracket(cls);
     } else {
-      // Not yet published — show blank bracket shell with round structure
       html+=renderBlankBracket(cls);
     }
     html+=`</div>`;
@@ -1983,7 +1995,7 @@ function renderBracketAdminControls(){
       </div>
       <div class="brc-actions">
         <button class="btn btn-ok btn-sm" onclick="autoFillBracket('${cls}');renderBracketAdminControls();renderPlayoffsTab();showToast('✓ ${clsNames[cls]} auto-filled from standings')">⚡ Auto-Fill Seeds</button>
-        <button class="btn btn-bl btn-sm" onclick="switchTab('playoffs');renderPlayoffsTab()">👁 View Bracket</button>
+        <button class="btn btn-bl btn-sm" onclick="adminPreviewBracket('${cls}')">👁 Preview Bracket</button>
         <button class="btn btn-d btn-sm" onclick="resetBracket('${cls}')">🗑 Reset</button>
       </div>
       ${cfg.slots&&cfg.slots.length?`<div style="margin-top:12px">
