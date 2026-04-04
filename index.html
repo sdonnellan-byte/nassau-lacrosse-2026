@@ -867,6 +867,12 @@ let isAdmin=false,editGameId=null,schedFilter='all';
 if(!state.pending)state.pending=[];
 if(!state.archives)state.archives=[];
 if(!state.playoffSpots)state.playoffSpots={...DEFAULT_PLAYOFF_SPOTS};
+if(!state.brackets)state.brackets=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG));
+
+// If local state has no played games, wipe localStorage so Firebase always wins on fresh load
+// This prevents an empty local cache from blocking real data from appearing
+const _localPlayed=(state.games||[]).filter(g=>g.played).length;
+if(_localPlayed===0){try{localStorage.removeItem(SK);}catch(e){}}
 
 // Live reference — always read from state so admin edits take effect immediately
 let PLAYOFF_SPOTS=state.playoffSpots;
