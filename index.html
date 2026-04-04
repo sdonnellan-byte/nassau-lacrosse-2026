@@ -184,7 +184,39 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
 .sg-img{width:100%;border-radius:8px;border:1px solid var(--border);margin-top:6px;background:var(--navy2);padding:8px;font-size:11px;color:var(--gray);text-align:center;font-style:italic}
 .team-link{cursor:pointer;transition:color .15s}
 .team-link:hover{color:var(--gold-lt);text-decoration:underline}
-.tp-header{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.bracket-wrap{overflow-x:auto;padding-bottom:12px}
+.bracket{display:flex;gap:0;align-items:stretch;min-width:600px}
+.bracket-round{display:flex;flex-direction:column;justify-content:space-around;min-width:180px;flex-shrink:0}
+.bracket-round-title{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--gray);text-align:center;padding:6px 0 10px}
+.bracket-round-title small{display:block;font-size:10px;font-weight:400;color:var(--text-dim);text-transform:none;letter-spacing:0;margin-top:1px}
+.bracket-match{display:flex;flex-direction:column;position:relative;margin:6px 0}
+.bracket-match::after{content:'';position:absolute;right:-1px;top:25%;height:50%;border-right:2px solid var(--border)}
+.bracket-match.final::after{display:none}
+.bracket-slot{display:flex;align-items:center;gap:7px;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;margin:2px 6px;font-size:12px;min-height:36px;cursor:default;transition:border-color .15s;position:relative}
+.bracket-slot.winner{border-color:var(--gold);background:rgba(245,158,11,.08)}
+.bracket-slot.editable{cursor:pointer}
+.bracket-slot.editable:hover{border-color:var(--blue-lt)}
+.bracket-seed{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:13px;color:var(--gold);min-width:18px;text-align:center;flex-shrink:0}
+.bracket-team{flex:1;font-weight:600;font-size:12px;color:var(--text)}
+.bracket-score{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;color:var(--gold);min-width:22px;text-align:right;flex-shrink:0}
+.bracket-conn{display:flex;align-items:center;width:14px;flex-shrink:0}
+.bracket-conn-line{width:14px;border-top:2px solid var(--border)}
+.bracket-champion{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(245,158,11,.18),rgba(245,158,11,.06));border:2px solid var(--gold);border-radius:10px;padding:14px 18px;margin:auto 8px;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:16px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;min-width:130px;text-align:center;justify-content:center}
+.brc-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px}
+.brc-header{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.brc-title{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;text-transform:uppercase;letter-spacing:1px}
+.brc-toggle{display:flex;align-items:center;gap:8px;margin-left:auto}
+.tog{position:relative;width:40px;height:22px;cursor:pointer}
+.tog input{opacity:0;width:0;height:0}
+.tog-sl{position:absolute;inset:0;background:var(--border);border-radius:11px;transition:.3s}
+.tog-sl:before{content:'';position:absolute;height:16px;width:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+.tog input:checked+.tog-sl{background:var(--green)}
+.tog input:checked+.tog-sl:before{transform:translateX(18px)}
+.brc-dates{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:12px}
+.brc-date-row{display:flex;flex-direction:column;gap:3px}
+.brc-date-row label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gray)}
+.brc-date-row input{padding:6px 9px;background:var(--navy);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:'Barlow',sans-serif}
+.brc-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .tp-logo{width:56px;height:56px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;flex-shrink:0}
 .tp-info{flex:1}
 .tp-name{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:26px;text-transform:uppercase;letter-spacing:1px;line-height:1.1;margin-bottom:5px}
@@ -421,6 +453,7 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
   <div class="tab" data-tab="class" onclick="switchTab('class')">🏆 Class Standings</div>
   <div class="tab" data-tab="schedule" onclick="switchTab('schedule')">📅 Schedule</div>
   <div class="tab" data-tab="results" onclick="switchTab('results')">🏁 Recent Results</div>
+  <div class="tab" data-tab="playoffs" id="tab-playoffs" style="display:none" onclick="switchTab('playoffs')">🥍 Playoffs</div>
   <div class="tab" data-tab="submit" onclick="switchTab('submit')">📬 Submit Score</div>
   <div class="tab" data-tab="login" style="display:none" onclick="switchTab('login')">🔐 Admin Login</div>
   <div class="tab" data-tab="admin" style="display:none" onclick="switchTab('admin')">⚙️ Admin <span class="bdg" id="pending-badge" style="display:none">0</span></div>
@@ -469,6 +502,11 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
   <div id="results-list-pub"></div>
 </div>
 
+<!-- PLAYOFFS -->
+<div id="panel-playoffs" class="panel">
+  <div id="playoffs-content"></div>
+</div>
+
 <!-- SUBMIT SCORE -->
 <div id="panel-submit" class="panel">
   <div class="scard" style="max-width:540px;margin:0 auto">
@@ -510,6 +548,7 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
   <div class="anav">
     <button class="anb active" onclick="switchAdminSub('scores',this)">⚽ Scores</button>
     <button class="anb" onclick="switchAdminSub('pending',this)">📬 Pending <span class="bdg" id="psub-bdg" style="display:none">0</span></button>
+    <button class="anb" onclick="switchAdminSub('playoffs',this)">🥍 Playoffs</button>
     <button class="anb" onclick="switchAdminSub('conferences',this)">🏟 Conferences &amp; Teams</button>
     <button class="anb" onclick="switchAdminSub('archive',this)">📦 Archive / New Season</button>
   </div>
@@ -542,6 +581,13 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
   <div class="asub" id="asub-pending">
     <div class="stitle">📬 Pending Coach Submissions</div>
     <div id="pending-list"><p class="no-res">No pending submissions.</p></div>
+  </div>
+
+  <!-- PLAYOFFS ADMIN -->
+  <div class="asub" id="asub-playoffs">
+    <div class="stitle">🥍 Playoff Bracket Management</div>
+    <div class="info">Configure and publish playoff brackets. Toggle visibility to show/hide the Playoffs tab from the public. Brackets auto-fill from current class standings. Admin can edit all team slots and scores directly on the bracket.</div>
+    <div id="bracket-admin-controls"></div>
   </div>
 
   <!-- CONFERENCES & TEAMS -->
@@ -792,7 +838,7 @@ function loadState(){
 
   // Fresh start
   TEAMS=JSON.parse(JSON.stringify(DEFAULT_TEAMS));buildTM();
-  return{teams:TEAMS,games:makeSchedule(),pending:[],year:2026,archives:[],playoffSpots:{...DEFAULT_PLAYOFF_SPOTS}};
+  return{teams:TEAMS,games:makeSchedule(),pending:[],year:2026,archives:[],playoffSpots:{...DEFAULT_PLAYOFF_SPOTS},brackets:JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG))};
 }
 
 function saveState(){
@@ -810,7 +856,8 @@ function saveState(){
       pending:state.pending||[],
       year:state.year||2026,
       archives:state.archives||[],
-      playoffSpots:state.playoffSpots||DEFAULT_PLAYOFF_SPOTS
+      playoffSpots:state.playoffSpots||DEFAULT_PLAYOFF_SPOTS,
+      brackets:state.brackets||{}
     }).catch(e=>console.error('Firebase save error:',e));
   }
 }
@@ -1637,11 +1684,332 @@ function renderResults(){
   }).join('');
 }
 
+// ── PLAYOFF BRACKETS ──────────────────────────────────────────────────────
+
+const DEFAULT_BRACKET_CONFIG={
+  A:{visible:false,size:8,rounds:[
+    {name:'Quarter Finals',date:'Thursday May 14, 2026',venue:'@ HS'},
+    {name:'Semifinals',date:'Tuesday May 19, 2026',venue:'@ HS'},
+    {name:'Finals',date:'Wednesday May 27, 2026',venue:'@ TBD'}],
+    champion:'Class A Champions',slots:[],matchResults:{},playinMatch:null},
+  B:{visible:false,size:10,rounds:[
+    {name:'First Round',date:'Wednesday May 13, 2026',venue:'@ HS'},
+    {name:'Quarter Finals',date:'Saturday May 16, 2026',venue:'@ HS'},
+    {name:'Semifinals',date:'Wednesday May 21, 2026',venue:'@ Adelphi University'},
+    {name:'Finals',date:'Wednesday May 27, 2026',venue:'@ Adelphi University'}],
+    champion:'Class B Champions',slots:[],matchResults:{},playinMatch:null},
+  C:{visible:false,size:8,rounds:[
+    {name:'Quarter Finals',date:'Friday May 15, 2026',venue:'@ HS'},
+    {name:'Semifinals',date:'Thursday May 22, 2026',venue:'@ HS'},
+    {name:'Finals',date:'Thursday May 28, 2026',venue:'@ TBD'}],
+    champion:'Class C Champions',slots:[],matchResults:{},playinMatch:null},
+  D:{visible:false,size:4,rounds:[
+    {name:'Semifinals',date:'Monday May 18, 2026',venue:'@ HS'},
+    {name:'Finals',date:'Thursday May 28, 2026',venue:'@ TBD'}],
+    champion:'Class D Champions',slots:[],matchResults:{},playinMatch:null}
+};
+
+function initBrackets(){
+  if(!state.brackets) state.brackets=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG));
+  ['A','B','C','D'].forEach(cls=>{
+    if(!state.brackets[cls]) state.brackets[cls]=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG[cls]));
+    if(!state.brackets[cls].rounds) state.brackets[cls].rounds=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG[cls].rounds));
+    if(!state.brackets[cls].matchResults) state.brackets[cls].matchResults={};
+    if(state.brackets[cls].playinMatch===undefined) state.brackets[cls].playinMatch=null;
+    if(!state.brackets[cls].slots) state.brackets[cls].slots=[];
+  });
+}
+
+function getBracketSeeds(cls){
+  const rec=computeStandings();
+  const confs=[...new Set(TEAMS.map(t=>t.conf))].sort();
+  const blocks=confs.map(c=>({conf:c,ids:sortTeams(TEAMS.filter(t=>t.cls===cls&&t.conf===c&&!t._ph).map(t=>t.id),rec)}));
+  const seeded=[];
+  blocks.forEach(({conf,ids})=>{
+    if(conf<=2)ids.forEach(id=>seeded.push({id,conf}));
+    else if(conf===3)ids.forEach(id=>seeded.push({id,conf}));
+  });
+  const spots=state.brackets[cls].size||(PLAYOFF_SPOTS[cls]||8);
+  return seeded.slice(0,spots);
+}
+
+function getConf4ChampForClass(cls){
+  const rec=computeStandings();
+  const conf4Teams=TEAMS.filter(t=>t.conf===4&&!t._ph);
+  const conf4Sorted=sortTeams(conf4Teams.map(t=>t.id),rec);
+  if(!conf4Sorted.length) return null;
+  const champId=conf4Sorted[0];
+  const champ=TM[champId];
+  if(!champ||champ.cls!==cls) return null;
+  return{id:champId,name:champ.name};
+}
+
+function autoFillBracket(cls){
+  initBrackets();
+  const seeds=getBracketSeeds(cls);
+  const cfg=state.brackets[cls];
+  const size=cfg.size||(PLAYOFF_SPOTS[cls]||8);
+  cfg.slots=[];
+  for(let i=0;i<size;i++){
+    const s=seeds[i];
+    cfg.slots.push({seed:i+1,team:s?(TM[s.id]||{name:'TBD'}).name:'TBD',teamId:s?s.id:null,score:null,winner:false});
+  }
+  const champ=getConf4ChampForClass(cls);
+  if(champ){
+    const lastSeed=cfg.slots[size-1];
+    cfg.playinMatch={champTeam:champ.name,champId:champ.id,champSeed:'C4 Champ',
+      oppTeam:lastSeed?lastSeed.team:'TBD',oppSeed:lastSeed?lastSeed.seed:size,
+      champScore:null,oppScore:null,winnerId:null};
+  }else{cfg.playinMatch=null;}
+  cfg.matchResults={};
+  saveState();
+}
+
+function renderBracket(cls){
+  initBrackets();
+  const cfg=state.brackets[cls];
+  if(!cfg) return'';
+  const slots=cfg.slots||[];
+  const rounds=cfg.rounds||DEFAULT_BRACKET_CONFIG[cls].rounds;
+  if(!cfg.matchResults) cfg.matchResults={};
+  const size=slots.length;
+  if(!size) return`<p class="no-res">No seeds yet. Admin: click ⚡ Auto-Fill to generate bracket from current standings.</p>`;
+
+  let numRounds=size<=4?2:size<=8?3:4;
+  const allRounds=[];
+  const half=Math.ceil(size/2);
+  const r0=[];
+  for(let i=0;i<half;i++){
+    const hi=slots[i]||{seed:i+1,team:'TBD'};
+    const li=slots[size-1-i]||{seed:size-i,team:'TBD'};
+    r0.push([hi,li]);
+  }
+  allRounds.push(r0);
+  for(let r=1;r<numRounds;r++){
+    const prev=allRounds[r-1];
+    const rnd=[];
+    for(let m=0;m<Math.ceil(prev.length/2);m++){
+      const key=`r${r}m${m}`;
+      const st=cfg.matchResults[key]||{};
+      rnd.push([
+        {seed:'',team:st.top||'TBD',score:st.topScore??null,winner:st.winner==='top'},
+        {seed:'',team:st.bot||'TBD',score:st.botScore??null,winner:st.winner==='bot'}
+      ]);
+    }
+    if(!rnd.length) rnd.push([{seed:'',team:'TBD',score:null,winner:false},{seed:'',team:'TBD',score:null,winner:false}]);
+    allRounds.push(rnd);
+  }
+
+  let html=`<div class="bracket-wrap"><div class="bracket">`;
+  allRounds.forEach((rnd,ri)=>{
+    const rInfo=rounds[ri]||{name:`Round ${ri+1}`,date:'',venue:''};
+    const isFinal=ri===allRounds.length-1;
+    html+=`<div class="bracket-round">
+      <div class="bracket-round-title">${rInfo.name}<small>${rInfo.date||''}</small><small style="color:var(--blue-lt)">${rInfo.venue||''}</small></div>`;
+    rnd.forEach((pair,mi)=>{
+      const key=`r${ri}m${mi}`;
+      html+=`<div class="bracket-match${isFinal?' final':''}">`;
+      pair.forEach((sl)=>{
+        const wc=sl.winner?'winner':'';
+        const ec=isAdmin?'editable':'';
+        const sc=sl.score!=null?`<span class="bracket-score">${sl.score}</span>`:'';
+        const oc=isAdmin?`onclick="openMatchEdit('${cls}','${key}',${ri},${mi})"`:''
+        html+=`<div class="bracket-slot ${wc} ${ec}" ${oc}>
+          <span class="bracket-seed">${sl.seed||''}</span>
+          <span class="bracket-team">${sl.team||'TBD'}</span>${sc}
+        </div>`;
+      });
+      html+=`</div>`;
+    });
+    html+=`</div>`;
+    if(ri<allRounds.length-1) html+=`<div style="display:flex;align-items:center;width:14px;flex-shrink:0"></div>`;
+  });
+
+  // Champion box
+  const champKey=`r${numRounds-1}m0`;
+  const champSt=cfg.matchResults[champKey]||{};
+  const champName=champSt.winner==='top'?champSt.top:champSt.winner==='bot'?champSt.bot:'';
+  html+=`<div style="display:flex;align-items:center;padding:0 8px;flex-shrink:0">
+    <div class="bracket-champion">🏆<div>
+      <div style="font-size:11px;letter-spacing:2px">${cfg.champion||'Class '+cls+' Champions'}</div>
+      ${champName?`<div style="font-size:13px;color:var(--text);margin-top:4px;text-transform:none">${champName}</div>`:''}
+    </div></div>
+  </div>`;
+  html+=`</div></div>`;
+
+  if(cfg.playinMatch){
+    const pi=cfg.playinMatch;
+    const hasScore=pi.champScore!=null&&pi.oppScore!=null;
+    html+=`<div style="margin-top:14px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:11px 14px;font-size:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <strong style="color:var(--gold)">⭐ Conf 4 Play-In:</strong>
+      <span>${pi.champTeam} (Conf 4 Champ) vs #${pi.oppSeed} ${pi.oppTeam}</span>
+      ${hasScore?`<span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--gold)">${pi.champScore}–${pi.oppScore}</span>`:''}
+      ${isAdmin?`<button class="btn btn-ol btn-sm" onclick="openPlayinEdit('${cls}')">✏️ Edit</button>`:''}
+    </div>`;
+  }
+  return html;
+}
+
+function renderPlayoffsTab(){
+  const el=document.getElementById('playoffs-content');if(!el)return;
+  initBrackets();
+  const year=state.year||2026;
+  const clsColors={A:'var(--cA)',B:'var(--cB)',C:'var(--cC)',D:'var(--cD)'};
+  let html=`<div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;text-transform:uppercase;letter-spacing:2px;color:var(--gold);margin-bottom:18px;text-align:center">Nassau County ${year} Playoff Brackets</div>`;
+  let any=false;
+  ['A','B','C','D'].forEach(cls=>{
+    const cfg=state.brackets[cls];
+    if(!cfg||!cfg.visible)return;
+    any=true;
+    html+=`<div style="margin-bottom:32px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:17px;text-transform:uppercase;letter-spacing:1px;color:${clsColors[cls]};margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid ${clsColors[cls]}">Nassau County Class "${cls}" Playoff Bracket</div>
+      ${renderBracket(cls)}
+    </div>`;
+  });
+  if(!any) html+=`<p class="no-res" style="text-align:center;padding:40px 0">Playoff brackets will be published here when available.</p>`;
+  el.innerHTML=html;
+}
+
+function renderBracketAdminControls(){
+  const el=document.getElementById('bracket-admin-controls');if(!el)return;
+  initBrackets();
+  const clsColors={A:'var(--cA)',B:'var(--cB)',C:'var(--cC)',D:'var(--cD)'};
+  const clsNames={A:'Class A',B:'Class B',C:'Class C',D:'Class D'};
+  let html='';
+  ['A','B','C','D'].forEach(cls=>{
+    const cfg=state.brackets[cls];
+    const rounds=cfg.rounds||DEFAULT_BRACKET_CONFIG[cls].rounds;
+    const vis=cfg.visible||false;
+    html+=`<div class="brc-card">
+      <div class="brc-header">
+        <div class="brc-title" style="color:${clsColors[cls]}">${clsNames[cls]} Bracket</div>
+        <div style="font-size:12px;color:var(--gray)">${cfg.slots&&cfg.slots.length?cfg.slots.length+' seeds':'No seeds yet'} · ${rounds.length} rounds</div>
+        <div class="brc-toggle">
+          <span style="font-size:12px;color:var(--gray)">Public</span>
+          <label class="tog"><input type="checkbox" ${vis?'checked':''} onchange="toggleBracketVisible('${cls}',this.checked)"><span class="tog-sl"></span></label>
+          <span style="font-size:12px;font-weight:700;color:${vis?'var(--green)':'var(--gray)'}">${vis?'Live':'Hidden'}</span>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--gray);margin-bottom:10px">
+        Bracket size (playoff seeds):
+        <input type="number" min="2" max="20" value="${cfg.size||PLAYOFF_SPOTS[cls]||8}" style="width:55px;padding:4px 7px;font-size:12px;margin-left:8px;background:var(--navy);border:1px solid var(--border);border-radius:5px;color:var(--text)" onchange="updateBracketSize('${cls}',this.value)">
+      </div>
+      <div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px">Round Dates &amp; Venues</div>
+      <div class="brc-dates">
+        ${rounds.map((r,ri)=>`<div class="brc-date-row">
+          <label>${r.name}</label>
+          <input type="text" value="${r.date||''}" placeholder="e.g. Thursday May 14, 2026" onchange="updateRoundDate('${cls}',${ri},'date',this.value)">
+          <input type="text" value="${r.venue||''}" placeholder="e.g. @ HS" style="margin-top:3px" onchange="updateRoundDate('${cls}',${ri},'venue',this.value)">
+        </div>`).join('')}
+      </div>
+      <div class="brc-actions">
+        <button class="btn btn-ok btn-sm" onclick="autoFillBracket('${cls}');renderBracketAdminControls();renderPlayoffsTab();showToast('✓ ${clsNames[cls]} auto-filled from standings')">⚡ Auto-Fill Seeds</button>
+        <button class="btn btn-bl btn-sm" onclick="switchTab('playoffs');renderPlayoffsTab()">👁 View Bracket</button>
+        <button class="btn btn-d btn-sm" onclick="resetBracket('${cls}')">🗑 Reset</button>
+      </div>
+      ${cfg.slots&&cfg.slots.length?`<div style="margin-top:12px">
+        <div style="font-size:11px;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:700">Seeds (click to edit name)</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:5px">
+          ${cfg.slots.map((s,i)=>`<div style="display:flex;align-items:center;gap:7px;background:var(--navy);border:1px solid var(--border);border-radius:6px;padding:6px 9px;cursor:pointer" onclick="editSeedSlot('${cls}',${i})">
+            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:14px;color:var(--gold);min-width:20px">${s.seed}</span>
+            <span style="font-size:12px;flex:1">${s.team||'TBD'}</span>
+            <span style="font-size:10px;color:var(--gray)">✏️</span>
+          </div>`).join('')}
+        </div>
+        ${cfg.playinMatch?`<div style="margin-top:8px;padding:8px 11px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:6px;font-size:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <strong style="color:var(--gold)">⭐ Play-In:</strong>
+          <span>${cfg.playinMatch.champTeam} (C4 Champ) vs #${cfg.playinMatch.oppSeed} ${cfg.playinMatch.oppTeam}</span>
+          <button class="btn btn-ol btn-sm" onclick="openPlayinEdit('${cls}')">✏️ Edit Result</button>
+        </div>`:''}
+      </div>`:''}
+    </div>`;
+  });
+  el.innerHTML=html;
+}
+
+function toggleBracketVisible(cls,val){
+  initBrackets();
+  state.brackets[cls].visible=val;
+  const anyVis=['A','B','C','D'].some(c=>state.brackets[c]&&state.brackets[c].visible);
+  const tabEl=document.getElementById('tab-playoffs');
+  if(tabEl) tabEl.style.display=anyVis?'':'none';
+  saveState();renderBracketAdminControls();renderPlayoffsTab();
+  showToast(`Class ${cls} bracket ${val?'is now PUBLIC ✓':'hidden from public'}`,(val?'':'tw'));
+}
+
+function updateBracketSize(cls,val){
+  const n=parseInt(val);if(isNaN(n)||n<2||n>20)return;
+  initBrackets();state.brackets[cls].size=n;saveState();
+  showToast(`Class ${cls} bracket: ${n} seeds`);
+}
+
+function updateRoundDate(cls,ri,field,val){
+  initBrackets();
+  if(!state.brackets[cls].rounds) state.brackets[cls].rounds=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG[cls].rounds));
+  state.brackets[cls].rounds[ri][field]=val;saveState();
+}
+
+function resetBracket(cls){
+  if(!confirm(`Reset Class ${cls} bracket? All scores and edits cleared.`))return;
+  initBrackets();
+  state.brackets[cls].slots=[];state.brackets[cls].matchResults={};state.brackets[cls].playinMatch=null;
+  saveState();renderBracketAdminControls();renderPlayoffsTab();showToast(`Class ${cls} bracket reset`,'tw');
+}
+
+function editSeedSlot(cls,idx){
+  if(!isAdmin)return;initBrackets();
+  const slot=state.brackets[cls].slots[idx];if(!slot)return;
+  const n=prompt(`Edit seed #${slot.seed} team name:`,slot.team||'');
+  if(n===null)return;
+  state.brackets[cls].slots[idx].team=n.trim()||'TBD';
+  saveState();renderBracketAdminControls();renderPlayoffsTab();
+}
+
+function openMatchEdit(cls,key,ri,mi){
+  if(!isAdmin)return;initBrackets();
+  if(!state.brackets[cls].matchResults) state.brackets[cls].matchResults={};
+  const st=state.brackets[cls].matchResults[key]||{};
+  const slots=state.brackets[cls].slots||[];
+  const size=slots.length;
+  let topName=st.top||(ri===0?(slots[mi]||{}).team||'TBD':'TBD');
+  let botName=st.bot||(ri===0?(slots[size-1-mi]||{}).team||'TBD':'TBD');
+  const ts=prompt(`${topName} score (blank = not played):`,st.topScore??'');if(ts===null)return;
+  const bs=prompt(`${botName} score:`,st.botScore??'');if(bs===null)return;
+  const tsv=ts.trim()===''?null:parseInt(ts);
+  const bsv=bs.trim()===''?null:parseInt(bs);
+  const winner=(tsv!=null&&bsv!=null)?(tsv>bsv?'top':'bot'):null;
+  state.brackets[cls].matchResults[key]={top:topName,bot:botName,topScore:tsv,botScore:bsv,winner};
+  // Auto-advance winner to next round
+  if(winner){
+    const wName=winner==='top'?topName:botName;
+    const nk=`r${ri+1}m${Math.floor(mi/2)}`;
+    if(!state.brackets[cls].matchResults[nk]) state.brackets[cls].matchResults[nk]={};
+    state.brackets[cls].matchResults[nk][mi%2===0?'top':'bot']=wName;
+  }
+  saveState();renderPlayoffsTab();if(isAdmin)renderBracketAdminControls();
+  showToast(`✓ ${topName} ${tsv??'—'}–${bsv??'—'} ${botName}`);
+}
+
+function openPlayinEdit(cls){
+  if(!isAdmin)return;initBrackets();
+  const pi=state.brackets[cls].playinMatch;if(!pi)return;
+  const cs=prompt(`${pi.champTeam} (Conf 4 Champ) score:`,pi.champScore??'');if(cs===null)return;
+  const os=prompt(`${pi.oppTeam} (#${pi.oppSeed}) score:`,pi.oppScore??'');if(os===null)return;
+  pi.champScore=cs.trim()===''?null:parseInt(cs);
+  pi.oppScore=os.trim()===''?null:parseInt(os);
+  if(pi.champScore!=null&&pi.oppScore!=null) pi.winnerId=pi.champScore>pi.oppScore?'champ':'opp';
+  saveState();renderPlayoffsTab();showToast('✓ Play-in result saved');
+}
+
 function renderAll(){
   renderConfStandings();renderClassStandings();renderSchedule();renderResults();
   updatePendingBubble();
-  if(isAdmin)renderAdminPanel();
+  if(isAdmin){renderAdminPanel();if(document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active'))renderBracketAdminControls();}
   updateTitle();initSelects();
+  initBrackets();
+  const anyVis=['A','B','C','D'].some(c=>state.brackets[c]&&state.brackets[c].visible);
+  const tabEl=document.getElementById('tab-playoffs');if(tabEl)tabEl.style.display=anyVis?'':'none';
+  renderPlayoffsTab();
 }
 
 // ── EXPORT CSV ────────────────────────────────────────────────────────────
@@ -1701,6 +2069,7 @@ function switchAdminSub(name,el){
   document.getElementById('asub-'+name).classList.add('active');
   if(name==='conferences')renderConfMgr();
   if(name==='archive'){renderArcListAdmin();updateTitle();}
+  if(name==='playoffs'){initBrackets();renderBracketAdminControls();}
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────────────────────
@@ -1709,6 +2078,7 @@ function switchTab(name){
   document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===`panel-${name}`));
   if(name==='admin')renderAdminPanel();
   if(name==='results')renderResults();
+  if(name==='playoffs')renderPlayoffsTab();
 }
 
 // ── TOAST ─────────────────────────────────────────────────────────────────
@@ -1907,6 +2277,7 @@ if(isFirebaseConfigured){
         state.year = data.year||state.year;
         state.archives = data.archives||[];
         if(data.playoffSpots){state.playoffSpots=data.playoffSpots;PLAYOFF_SPOTS=state.playoffSpots;}
+        if(data.brackets) state.brackets=data.brackets;
         try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
         renderAll();
         setFBBanner('connected');
