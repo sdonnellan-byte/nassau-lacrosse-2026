@@ -717,6 +717,31 @@ const DEFAULT_TEAMS=[
 // PLAYOFF_SPOTS — stored in state so admin can edit per season. Defaults shown below.
 const DEFAULT_PLAYOFF_SPOTS={A:8,B:10,C:8,D:4};
 // PLAYOFF_SPOTS is set from state after loadState() runs (see below)
+
+// DEFAULT BRACKET CONFIG — must be defined before loadState() is called
+const DEFAULT_BRACKET_CONFIG={
+  A:{visible:false,size:8,rounds:[
+    {name:'Quarter Finals',date:'Thursday May 14, 2026',venue:'@ HS'},
+    {name:'Semifinals',date:'Tuesday May 19, 2026',venue:'@ HS'},
+    {name:'Finals',date:'Wednesday May 27, 2026',venue:'@ TBD'}],
+    champion:'Class A Champions',slots:[],matchResults:{},playinMatch:null},
+  B:{visible:false,size:10,rounds:[
+    {name:'First Round',date:'Wednesday May 13, 2026',venue:'@ HS'},
+    {name:'Quarter Finals',date:'Saturday May 16, 2026',venue:'@ HS'},
+    {name:'Semifinals',date:'Wednesday May 21, 2026',venue:'@ Adelphi University'},
+    {name:'Finals',date:'Wednesday May 27, 2026',venue:'@ Adelphi University'}],
+    champion:'Class B Champions',slots:[],matchResults:{},playinMatch:null},
+  C:{visible:false,size:8,rounds:[
+    {name:'Quarter Finals',date:'Friday May 15, 2026',venue:'@ HS'},
+    {name:'Semifinals',date:'Thursday May 22, 2026',venue:'@ HS'},
+    {name:'Finals',date:'Thursday May 28, 2026',venue:'@ TBD'}],
+    champion:'Class C Champions',slots:[],matchResults:{},playinMatch:null},
+  D:{visible:false,size:4,rounds:[
+    {name:'Semifinals',date:'Monday May 18, 2026',venue:'@ HS'},
+    {name:'Finals',date:'Thursday May 28, 2026',venue:'@ TBD'}],
+    champion:'Class D Champions',slots:[],matchResults:{},playinMatch:null}
+};
+
 const SK='ncgl2026_v7';
 
 // ID migration map: old broken IDs → correct new IDs
@@ -1691,29 +1716,6 @@ function renderResults(){
 }
 
 // ── PLAYOFF BRACKETS ──────────────────────────────────────────────────────
-
-const DEFAULT_BRACKET_CONFIG={
-  A:{visible:false,size:8,rounds:[
-    {name:'Quarter Finals',date:'Thursday May 14, 2026',venue:'@ HS'},
-    {name:'Semifinals',date:'Tuesday May 19, 2026',venue:'@ HS'},
-    {name:'Finals',date:'Wednesday May 27, 2026',venue:'@ TBD'}],
-    champion:'Class A Champions',slots:[],matchResults:{},playinMatch:null},
-  B:{visible:false,size:10,rounds:[
-    {name:'First Round',date:'Wednesday May 13, 2026',venue:'@ HS'},
-    {name:'Quarter Finals',date:'Saturday May 16, 2026',venue:'@ HS'},
-    {name:'Semifinals',date:'Wednesday May 21, 2026',venue:'@ Adelphi University'},
-    {name:'Finals',date:'Wednesday May 27, 2026',venue:'@ Adelphi University'}],
-    champion:'Class B Champions',slots:[],matchResults:{},playinMatch:null},
-  C:{visible:false,size:8,rounds:[
-    {name:'Quarter Finals',date:'Friday May 15, 2026',venue:'@ HS'},
-    {name:'Semifinals',date:'Thursday May 22, 2026',venue:'@ HS'},
-    {name:'Finals',date:'Thursday May 28, 2026',venue:'@ TBD'}],
-    champion:'Class C Champions',slots:[],matchResults:{},playinMatch:null},
-  D:{visible:false,size:4,rounds:[
-    {name:'Semifinals',date:'Monday May 18, 2026',venue:'@ HS'},
-    {name:'Finals',date:'Thursday May 28, 2026',venue:'@ TBD'}],
-    champion:'Class D Champions',slots:[],matchResults:{},playinMatch:null}
-};
 
 function initBrackets(){
   if(!state.brackets) state.brackets=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG));
