@@ -1793,27 +1793,29 @@ function renderBracket(cls){
   if(byeSeeds>0){
     // Special structure: First Round = only the non-bye seeds play
     // e.g. Class B: seeds 7v10 and 8v9 in First Round; seeds 1-6 get byes to QF
-    const firstRoundTeams=slots.slice(byeSeeds); // seeds 7,8,9,10
+    const firstRoundTeams=slots.slice(byeSeeds); // seeds 7,8,9,10 (indices 6,7,8,9)
     const r0=[];
-    // Pair them: highest vs lowest remaining: 7v10, 8v9
-    for(let i=0;i<Math.floor(firstRoundTeams.length/2);i++){
-      const hi=firstRoundTeams[i];
-      const li=firstRoundTeams[firstRoundTeams.length-1-i];
-      r0.push([hi,li]);
-    }
+    // r0m0: #8 vs #9 — winner plays #1 in QF
+    // r0m1: #7 vs #10 — winner plays #2 in QF
+    // firstRoundTeams = [seed7, seed8, seed9, seed10]
+    // 8v9: firstRoundTeams[1] vs firstRoundTeams[2]
+    // 7v10: firstRoundTeams[0] vs firstRoundTeams[3]
+    r0.push([firstRoundTeams[1], firstRoundTeams[2]]); // r0m0: #8 vs #9
+    r0.push([firstRoundTeams[0], firstRoundTeams[3]]); // r0m1: #7 vs #10
     allRounds.push(r0); // First Round: 2 games
 
     // Quarter Finals: bye seeds (1-6) + first round winners (2) = 8 teams = 4 games
     const qfRnd=[];
-    // Top half of bracket: seeds 1,4,5 + winner of one first round game
-    // Bottom half: seeds 2,3,6 + winner of other first round game
-    // Matchups per bracket: 1 vs FR-winner1, 4 vs 5, 2 vs FR-winner2, 3 vs 6
+    // Quarter Finals matchups matching the official bracket:
+    // Top half:    #1 vs winner of 8v9,  #4 vs #5
+    // Bottom half: #2 vs winner of 7v10, #3 vs #6
+    // r0m0 = 8v9 (hi=slots[7], li=slots[8])
+    // r0m1 = 7v10 (hi=slots[6], li=slots[9])
     const qfMatchups=[
-      // [byeSeedIdx, opponent]
-      [0, 'fr0'], // 1 vs winner of 8v9
-      [3, 4],    // 4 vs 5
-      [1, 'fr1'], // 2 vs winner of 7v10
-      [2, 5],    // 3 vs 6
+      [0, 'fr0'], // #1 vs winner of 8v9  (r0m0)
+      [3, 4],     // #4 vs #5
+      [1, 'fr1'], // #2 vs winner of 7v10 (r0m1)
+      [2, 5],     // #3 vs #6
     ];
     qfMatchups.forEach((pair,mi)=>{
       const key=`r1m${mi}`;
