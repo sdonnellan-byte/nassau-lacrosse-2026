@@ -1725,6 +1725,10 @@ function initBrackets(){
     if(!state.brackets[cls].matchResults) state.brackets[cls].matchResults={};
     if(state.brackets[cls].playinMatch===undefined) state.brackets[cls].playinMatch=null;
     if(!state.brackets[cls].slots) state.brackets[cls].slots=[];
+    // Always sync byeSeeds from DEFAULT config — this fixes Class B (6 bye seeds) after state was saved without it
+    if(DEFAULT_BRACKET_CONFIG[cls].byeSeeds&&!state.brackets[cls].byeSeeds){
+      state.brackets[cls].byeSeeds=DEFAULT_BRACKET_CONFIG[cls].byeSeeds;
+    }
   });
 }
 
@@ -1783,7 +1787,7 @@ function renderBracket(cls){
   const size=slots.length;
   if(!size) return`<p class="no-res">No seeds yet. Admin: click ⚡ Auto-Fill to generate bracket from current standings.</p>`;
 
-  const byeSeeds=cfg.byeSeeds||0; // number of top seeds that get byes (e.g. 6 for Class B)
+  const byeSeeds=cfg.byeSeeds||(DEFAULT_BRACKET_CONFIG[cls]&&DEFAULT_BRACKET_CONFIG[cls].byeSeeds)||0;
   const allRounds=[];
 
   if(byeSeeds>0){
