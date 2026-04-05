@@ -725,7 +725,7 @@ const DEFAULT_BRACKET_CONFIG={
     {name:'Semifinals',date:'Tuesday May 19, 2026',venue:'@ HS'},
     {name:'Finals',date:'Wednesday May 27, 2026',venue:'@ TBD'}],
     champion:'Class A Champions',slots:[],matchResults:{},playinMatch:null},
-  B:{visible:false,size:10,rounds:[
+  B:{visible:false,size:10,byeSeeds:6,rounds:[
     {name:'First Round',date:'Wednesday May 13, 2026',venue:'@ HS'},
     {name:'Quarter Finals',date:'Saturday May 16, 2026',venue:'@ HS'},
     {name:'Semifinals',date:'Wednesday May 21, 2026',venue:'@ Adelphi University'},
@@ -1783,35 +1783,113 @@ function renderBracket(cls){
   const size=slots.length;
   if(!size) return`<p class="no-res">No seeds yet. Admin: click ⚡ Auto-Fill to generate bracket from current standings.</p>`;
 
-  let numRounds=size<=4?2:size<=8?3:4;
+  const byeSeeds=cfg.byeSeeds||0; // number of top seeds that get byes (e.g. 6 for Class B)
   const allRounds=[];
-  const half=Math.ceil(size/2);
-  const r0=[];
-  for(let i=0;i<half;i++){
-    const hi=slots[i]||{seed:i+1,team:'TBD'};
-    const li=slots[size-1-i]||{seed:size-i,team:'TBD'};
-    r0.push([hi,li]);
-  }
-  allRounds.push(r0);
-  for(let r=1;r<numRounds;r++){
-    const prev=allRounds[r-1];
-    const rnd=[];
-    for(let m=0;m<Math.ceil(prev.length/2);m++){
-      const key=`r${r}m${m}`;
+
+  if(byeSeeds>0){
+    // Special structure: First Round = only the non-bye seeds play
+    // e.g. Class B: seeds 7v10 and 8v9 in First Round; seeds 1-6 get byes to QF
+    const firstRoundTeams=slots.slice(byeSeeds); // seeds 7,8,9,10
+    const r0=[];
+    // Pair them: highest vs lowest remaining: 7v10, 8v9
+    for(let i=0;i<Math.floor(firstRoundTeams.length/2);i++){
+      const hi=firstRoundTeams[i];
+      const li=firstRoundTeams[firstRoundTeams.length-1-i];
+      r0.push([hi,li]);
+    }
+    allRounds.push(r0); // First Round: 2 games
+
+    // Quarter Finals: bye seeds (1-6) + first round winners (2) = 8 teams = 4 games
+    const qfRnd=[];
+    // Top half of bracket: seeds 1,4,5 + winner of one first round game
+    // Bottom half: seeds 2,3,6 + winner of other first round game
+    // Matchups per bracket: 1 vs FR-winner1, 4 vs 5, 2 vs FR-winner2, 3 vs 6
+    const qfMatchups=[
+      // [byeSeedIdx, opponent]
+      [0, 'fr0'], // 1 vs winner of 8v9
+      [3, 4],    // 4 vs 5
+      [1, 'fr1'], // 2 vs winner of 7v10
+      [2, 5],    // 3 vs 6
+    ];
+    qfMatchups.forEach((pair,mi)=>{
+      const key=`r1m${mi}`;
       const st=cfg.matchResults[key]||{};
-      rnd.push([
+      let topTeam,botTeam;
+      // Top slot
+      if(typeof pair[0]==='number'){
+        topTeam=st.top||(slots[pair[0]]?slots[pair[0]].team:'TBD');
+      }else{
+        const frKey=pair[0]==='fr0'?'r0m0':'r0m1';
+        const frSt=cfg.matchResults[frKey]||{};
+        topTeam=st.top||(frSt.winner==='top'?frSt.top:frSt.winner==='bot'?frSt.bot:'FR Winner');
+      }
+      // Bottom slot
+      if(typeof pair[1]==='number'){
+        botTeam=st.bot||(slots[pair[1]]?slots[pair[1]].team:'TBD');
+      }else{
+        const frKey=pair[1]==='fr1'?'r0m1':'r0m0';
+        const frSt=cfg.matchResults[frKey]||{};
+        botTeam=st.bot||(frSt.winner==='top'?frSt.top:frSt.winner==='bot'?frSt.bot:'FR Winner');
+      }
+      qfRnd.push([
+        {seed:typeof pair[0]==='number'?slots[pair[0]]?.seed:'',team:topTeam,score:st.topScore??null,winner:st.winner==='top'},
+        {seed:typeof pair[1]==='number'?slots[pair[1]]?.seed:'',team:botTeam,score:st.botScore??null,winner:st.winner==='bot'}
+      ]);
+    });
+    allRounds.push(qfRnd);
+
+    // Semifinals: 4 QF winners = 2 games
+    const sfRnd=[];
+    for(let m=0;m<2;m++){
+      const key=`r2m${m}`;
+      const st=cfg.matchResults[key]||{};
+      sfRnd.push([
         {seed:'',team:st.top||'TBD',score:st.topScore??null,winner:st.winner==='top'},
         {seed:'',team:st.bot||'TBD',score:st.botScore??null,winner:st.winner==='bot'}
       ]);
     }
-    if(!rnd.length) rnd.push([{seed:'',team:'TBD',score:null,winner:false},{seed:'',team:'TBD',score:null,winner:false}]);
-    allRounds.push(rnd);
+    allRounds.push(sfRnd);
+
+    // Finals: 1 game
+    const finKey='r3m0';
+    const finSt=cfg.matchResults[finKey]||{};
+    allRounds.push([[
+      {seed:'',team:finSt.top||'TBD',score:finSt.topScore??null,winner:finSt.winner==='top'},
+      {seed:'',team:finSt.bot||'TBD',score:finSt.botScore??null,winner:finSt.winner==='bot'}
+    ]]);
+
+  } else {
+    // Standard bracket: pair 1v(n), 2v(n-1), etc.
+    let numRounds=size<=4?2:size<=8?3:4;
+    const half=Math.ceil(size/2);
+    const r0=[];
+    for(let i=0;i<half;i++){
+      const hi=slots[i]||{seed:i+1,team:'TBD'};
+      const li=slots[size-1-i]||{seed:size-i,team:'TBD'};
+      r0.push([hi,li]);
+    }
+    allRounds.push(r0);
+    for(let r=1;r<numRounds;r++){
+      const prev=allRounds[r-1];
+      const rnd=[];
+      for(let m=0;m<Math.ceil(prev.length/2);m++){
+        const key=`r${r}m${m}`;
+        const st=cfg.matchResults[key]||{};
+        rnd.push([
+          {seed:'',team:st.top||'TBD',score:st.topScore??null,winner:st.winner==='top'},
+          {seed:'',team:st.bot||'TBD',score:st.botScore??null,winner:st.winner==='bot'}
+        ]);
+      }
+      if(!rnd.length) rnd.push([{seed:'',team:'TBD',score:null,winner:false},{seed:'',team:'TBD',score:null,winner:false}]);
+      allRounds.push(rnd);
+    }
   }
 
+  const numRounds=allRounds.length;
   let html=`<div class="bracket-wrap"><div class="bracket">`;
   allRounds.forEach((rnd,ri)=>{
     const rInfo=rounds[ri]||{name:`Round ${ri+1}`,date:'',venue:''};
-    const isFinal=ri===allRounds.length-1;
+    const isFinal=ri===numRounds-1;
     html+=`<div class="bracket-round">
       <div class="bracket-round-title">${rInfo.name}<small>${rInfo.date||''}</small><small style="color:var(--blue-lt)">${rInfo.venue||''}</small></div>`;
     rnd.forEach((pair,mi)=>{
@@ -1830,7 +1908,7 @@ function renderBracket(cls){
       html+=`</div>`;
     });
     html+=`</div>`;
-    if(ri<allRounds.length-1) html+=`<div style="display:flex;align-items:center;width:14px;flex-shrink:0"></div>`;
+    if(ri<numRounds-1) html+=`<div style="display:flex;align-items:center;width:14px;flex-shrink:0"></div>`;
   });
 
   // Champion box
@@ -1899,42 +1977,49 @@ function renderPlayoffsTab(highlightCls){
 }
 
 function renderBlankBracket(cls){
-  // Shows the bracket shell (rounds, empty seed slots) without revealing team names
   initBrackets();
   const cfg=state.brackets[cls];
   const rounds=cfg.rounds||DEFAULT_BRACKET_CONFIG[cls].rounds;
   const size=cfg.size||(PLAYOFF_SPOTS[cls]||8);
-  const numRounds=size<=4?2:size<=8?3:4;
-  const half=Math.ceil(size/2);
-
-  // Build empty round structure
+  const byeSeeds=cfg.byeSeeds||(DEFAULT_BRACKET_CONFIG[cls]&&DEFAULT_BRACKET_CONFIG[cls].byeSeeds)||0;
+  const numRounds=rounds.length;
   const allRounds=[];
-  const r0=[];
-  for(let i=0;i<half;i++){
-    r0.push([
-      {seed:i+1,team:'TBD'},
-      {seed:size-i,team:'TBD'}
-    ]);
-  }
-  allRounds.push(r0);
-  for(let r=1;r<numRounds;r++){
-    const prev=allRounds[r-1];
-    const rnd=[];
-    for(let m=0;m<Math.ceil(prev.length/2);m++){
-      rnd.push([{seed:'',team:'TBD'},{seed:'',team:'TBD'}]);
+  if(byeSeeds>0){
+    const frGames=Math.floor((size-byeSeeds)/2);
+    const r0=[];
+    for(let i=0;i<frGames;i++) r0.push([{seed:'—',team:'TBD'},{seed:'—',team:'TBD'}]);
+    allRounds.push(r0);
+    const qfGames=Math.ceil((byeSeeds+frGames)/2);
+    const r1=[];
+    for(let i=0;i<qfGames;i++) r1.push([{seed:'—',team:'TBD'},{seed:'—',team:'TBD'}]);
+    allRounds.push(r1);
+    for(let r=2;r<numRounds;r++){
+      const prev=allRounds[r-1];
+      const rnd=[];
+      for(let m=0;m<Math.ceil(prev.length/2);m++) rnd.push([{seed:'—',team:'TBD'},{seed:'—',team:'TBD'}]);
+      if(!rnd.length) rnd.push([{seed:'—',team:'TBD'},{seed:'—',team:'TBD'}]);
+      allRounds.push(rnd);
     }
-    if(!rnd.length) rnd.push([{seed:'',team:'TBD'},{seed:'',team:'TBD'}]);
-    allRounds.push(rnd);
+  } else {
+    const stdRounds=size<=4?2:size<=8?3:4;
+    const half=Math.ceil(size/2);
+    const r0=[];
+    for(let i=0;i<half;i++) r0.push([{seed:i+1,team:'TBD'},{seed:size-i,team:'TBD'}]);
+    allRounds.push(r0);
+    for(let r=1;r<stdRounds;r++){
+      const prev=allRounds[r-1];
+      const rnd=[];
+      for(let m=0;m<Math.ceil(prev.length/2);m++) rnd.push([{seed:'',team:'TBD'},{seed:'',team:'TBD'}]);
+      if(!rnd.length) rnd.push([{seed:'',team:'TBD'},{seed:'',team:'TBD'}]);
+      allRounds.push(rnd);
+    }
   }
-
   const champion=cfg.champion||`Class ${cls} Champions`;
   let html=`<div class="bracket-wrap"><div class="bracket">`;
-
   allRounds.forEach((rnd,ri)=>{
     const rInfo=rounds[ri]||{name:`Round ${ri+1}`,date:'',venue:''};
     const isFinal=ri===allRounds.length-1;
-    html+=`<div class="bracket-round">
-      <div class="bracket-round-title">${rInfo.name}<small>${rInfo.date||''}</small><small style="color:var(--blue-lt)">${rInfo.venue||''}</small></div>`;
+    html+=`<div class="bracket-round"><div class="bracket-round-title">${rInfo.name}<small>${rInfo.date||''}</small><small style="color:var(--blue-lt)">${rInfo.venue||''}</small></div>`;
     rnd.forEach(()=>{
       html+=`<div class="bracket-match${isFinal?' final':''}">
         <div class="bracket-slot"><span class="bracket-seed" style="color:var(--gray);font-size:11px">—</span><span class="bracket-team" style="color:var(--gray);font-style:italic">TBD</span></div>
@@ -1944,24 +2029,18 @@ function renderBlankBracket(cls){
     html+=`</div>`;
     if(ri<allRounds.length-1) html+=`<div style="display:flex;align-items:center;width:14px;flex-shrink:0"></div>`;
   });
-
-  html+=`<div style="display:flex;align-items:center;padding:0 8px;flex-shrink:0">
-    <div class="bracket-champion">🏆<div>
-      <div style="font-size:11px;letter-spacing:2px">${champion}</div>
-    </div></div>
-  </div>`;
+  html+=`<div style="display:flex;align-items:center;padding:0 8px;flex-shrink:0"><div class="bracket-champion">🏆<div><div style="font-size:11px;letter-spacing:2px">${champion}</div></div></div></div>`;
   html+=`</div></div>`;
-
-  // Show play-in note if the conf4 champ is in this class (dynamic — follows live standings)
   const champ=getConf4ChampForClass(cls);
   if(champ){
     html+=`<div style="margin-top:14px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:11px 14px;font-size:12px;color:var(--gray);font-style:italic">
       ⭐ <strong style="color:var(--gold)">Conf 4 Play-In game will appear here</strong> when bracket is published.
     </div>`;
   }
-
   return html;
 }
+
+
 
 function renderBracketAdminControls(){
   const el=document.getElementById('bracket-admin-controls');if(!el)return;
