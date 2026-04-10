@@ -1899,16 +1899,16 @@ function renderBracket(cls){
 
     // Quarter Finals: bye seeds (1-6) + first round winners (2) = 8 teams = 4 games
     const qfRnd=[];
-    // Quarter Finals matchups matching the official bracket:
-    // Top half:    #1 vs winner of 8v9,  #4 vs #5
-    // Bottom half: #2 vs winner of 7v10, #3 vs #6
-    // r0m0 = 8v9 (hi=slots[7], li=slots[8])
-    // r0m1 = 7v10 (hi=slots[6], li=slots[9])
+    // Quarter Finals matchups — correct bracket order:
+    // Top half:    #1 vs winner of 8v9 (r0m0),  #4 vs #5
+    // Bottom half: #3 vs #6,                    #2 vs winner of 7v10 (r0m1)
+    // This puts 8v9 winner adjacent to #1, and 7v10 winner adjacent to #2
+    // Semis: (1/8v9 winner) vs (4/5 winner) | (3/6 winner) vs (2/7v10 winner)
     const qfMatchups=[
-      [0, 'fr0'], // #1 vs winner of 8v9  (r0m0)
+      [0, 'fr0'], // #1 vs winner of 8v9  (top of bracket)
       [3, 4],     // #4 vs #5
-      [1, 'fr1'], // #2 vs winner of 7v10 (r0m1)
       [2, 5],     // #3 vs #6
+      [1, 'fr1'], // #2 vs winner of 7v10 (bottom of bracket)
     ];
     qfMatchups.forEach((pair,mi)=>{
       const key=`r1m${mi}`;
@@ -1958,14 +1958,31 @@ function renderBracket(cls){
     ]]);
 
   } else {
-    // Standard bracket: pair 1v(n), 2v(n-1), etc.
+    // Correct bracket order: 1v8, 4v5, 3v6, 2v7
+    // Top half (feeds top semifinal):    1v8, 4v5
+    // Bottom half (feeds bottom semifinal): 3v6, 2v7
+    // This ensures 1-seed and 2-seed are on opposite sides of the bracket
     let numRounds=size<=4?2:size<=8?3:4;
-    const half=Math.ceil(size/2);
     const r0=[];
-    for(let i=0;i<half;i++){
-      const hi=slots[i]||{seed:i+1,team:'TBD'};
-      const li=slots[size-1-i]||{seed:size-i,team:'TBD'};
-      r0.push([hi,li]);
+    if(size===8){
+      // Explicit correct order: 1v8, 4v5, 3v6, 2v7
+      const matchupOrder=[[0,7],[3,4],[2,5],[1,6]];
+      matchupOrder.forEach(([hi,lo])=>{
+        r0.push([
+          slots[hi]||{seed:hi+1,team:'TBD'},
+          slots[lo]||{seed:lo+1,team:'TBD'}
+        ]);
+      });
+    } else if(size===4){
+      // 1v4, 2v3
+      r0.push([slots[0]||{seed:1,team:'TBD'},slots[3]||{seed:4,team:'TBD'}]);
+      r0.push([slots[1]||{seed:2,team:'TBD'},slots[2]||{seed:3,team:'TBD'}]);
+    } else {
+      // Generic fallback for other sizes
+      const half=Math.ceil(size/2);
+      for(let i=0;i<half;i++){
+        r0.push([slots[i]||{seed:i+1,team:'TBD'},slots[size-1-i]||{seed:size-i,team:'TBD'}]);
+      }
     }
     allRounds.push(r0);
     for(let r=1;r<numRounds;r++){
@@ -2101,9 +2118,17 @@ function renderBlankBracket(cls){
     }
   } else {
     const stdRounds=size<=4?2:size<=8?3:4;
-    const half=Math.ceil(size/2);
     const r0=[];
-    for(let i=0;i<half;i++) r0.push([{seed:i+1,team:'TBD'},{seed:size-i,team:'TBD'}]);
+    if(size===8){
+      // Correct order: 1v8, 4v5, 3v6, 2v7
+      [[1,8],[4,5],[3,6],[2,7]].forEach(([h,l])=>r0.push([{seed:h,team:'TBD'},{seed:l,team:'TBD'}]));
+    } else if(size===4){
+      r0.push([{seed:1,team:'TBD'},{seed:4,team:'TBD'}]);
+      r0.push([{seed:2,team:'TBD'},{seed:3,team:'TBD'}]);
+    } else {
+      const half=Math.ceil(size/2);
+      for(let i=0;i<half;i++) r0.push([{seed:i+1,team:'TBD'},{seed:size-i,team:'TBD'}]);
+    }
     allRounds.push(r0);
     for(let r=1;r<stdRounds;r++){
       const prev=allRounds[r-1];
