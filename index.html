@@ -724,7 +724,7 @@ const DEFAULT_TEAMS=[
   {id:'GCOVE',name:'Glen Cove',conf:4,cls:'B'},
   {id:'IT',name:'Island Trees',conf:4,cls:'C'},
   {id:'CLAR',name:'Clarke',conf:4,cls:'C'},
-  {id:'MER',name:'Malverne/Rockaway',conf:4,cls:'C'},
+  {id:'MER',name:'Malverne/East Rockaway',conf:4,cls:'C'},
   {id:'WH',name:'West Hempstead',conf:4,cls:'D'},
   {id:'FREE',name:'Freeport',conf:4,cls:'A'},
   {id:'JER',name:'Jericho',conf:4,cls:'B'},
@@ -781,10 +781,17 @@ const CLASS_CORRECTIONS={
   'FREE': 'A',  // Freeport is Class A (was incorrectly Class B)
 };
 
+// Name corrections — applied to teams loaded from Firebase/localStorage that have stale names
+const NAME_CORRECTIONS={
+  'MER': 'Malverne/East Rockaway',
+};
+
 function applyClassCorrections(teams){
   return (teams||[]).map(t=>{
-    if(CLASS_CORRECTIONS[t.id]) return{...t,cls:CLASS_CORRECTIONS[t.id]};
-    return t;
+    let updated={...t};
+    if(CLASS_CORRECTIONS[t.id]) updated.cls=CLASS_CORRECTIONS[t.id];
+    if(NAME_CORRECTIONS[t.id]) updated.name=NAME_CORRECTIONS[t.id];
+    return updated;
   });
 }
 
@@ -1884,78 +1891,146 @@ function renderBracket(cls){
   const allRounds=[];
 
   if(byeSeeds>0){
-    // Special structure: First Round = only the non-bye seeds play
-    // e.g. Class B: seeds 7v10 and 8v9 in First Round; seeds 1-6 get byes to QF
-    const firstRoundTeams=slots.slice(byeSeeds); // seeds 7,8,9,10 (indices 6,7,8,9)
-    const r0=[];
-    // r0m0: #8 vs #9 — winner plays #1 in QF
-    // r0m1: #7 vs #10 — winner plays #2 in QF
-    // firstRoundTeams = [seed7, seed8, seed9, seed10]
-    // 8v9: firstRoundTeams[1] vs firstRoundTeams[2]
-    // 7v10: firstRoundTeams[0] vs firstRoundTeams[3]
-    r0.push([firstRoundTeams[1], firstRoundTeams[2]]); // r0m0: #8 vs #9
-    r0.push([firstRoundTeams[0], firstRoundTeams[3]]); // r0m1: #7 vs #10
-    allRounds.push(r0); // First Round: 2 games
+    // Class B special layout: render as custom HTML so FR games align visually with their QF opponent
+    // 8v9 winner → plays #1 (top), 7v10 winner → plays #2 (bottom)
+    const ft=slots.slice(byeSeeds); // [seed7, seed8, seed9, seed10]
+    const s89=[ft[1],ft[2]]; // #8 vs #9
+    const s710=[ft[0],ft[3]]; // #7 vs #10
+    const fr0=cfg.matchResults['r0m0']||{}; // 8v9 result
+    const fr1=cfg.matchResults['r0m1']||{}; // 7v10 result
+    const fr0winner=fr0.winner==='top'?fr0.top:fr0.winner==='bot'?fr0.bot:'FR Winner';
+    const fr1winner=fr1.winner==='top'?fr1.top:fr1.winner==='bot'?fr1.bot:'FR Winner';
 
-    // Quarter Finals: bye seeds (1-6) + first round winners (2) = 8 teams = 4 games
-    const qfRnd=[];
-    // Quarter Finals matchups — correct bracket order:
-    // Top half:    #1 vs winner of 8v9 (r0m0),  #4 vs #5
-    // Bottom half: #3 vs #6,                    #2 vs winner of 7v10 (r0m1)
-    // This puts 8v9 winner adjacent to #1, and 7v10 winner adjacent to #2
-    // Semis: (1/8v9 winner) vs (4/5 winner) | (3/6 winner) vs (2/7v10 winner)
-    const qfMatchups=[
-      [0, 'fr0'], // #1 vs winner of 8v9  (top of bracket)
-      [3, 4],     // #4 vs #5
-      [2, 5],     // #3 vs #6
-      [1, 'fr1'], // #2 vs winner of 7v10 (bottom of bracket)
+    // QF matchups
+    const qf=[
+      {key:'r1m0',top:{seed:slots[0]?.seed,team:slots[0]?.team||'TBD'},bot:{seed:'',team:fr0.winner?fr0winner:'FR Winner'},frGame:'top'},
+      {key:'r1m1',top:{seed:slots[3]?.seed,team:slots[3]?.team||'TBD'},bot:{seed:slots[4]?.seed,team:slots[4]?.team||'TBD'},frGame:null},
+      {key:'r1m2',top:{seed:slots[2]?.seed,team:slots[2]?.team||'TBD'},bot:{seed:slots[5]?.seed,team:slots[5]?.team||'TBD'},frGame:null},
+      {key:'r1m3',top:{seed:slots[1]?.seed,team:slots[1]?.team||'TBD'},bot:{seed:'',team:fr1.winner?fr1winner:'FR Winner'},frGame:'bot'},
     ];
-    qfMatchups.forEach((pair,mi)=>{
-      const key=`r1m${mi}`;
-      const st=cfg.matchResults[key]||{};
-      let topTeam,botTeam;
-      // Top slot
-      if(typeof pair[0]==='number'){
-        topTeam=st.top||(slots[pair[0]]?slots[pair[0]].team:'TBD');
-      }else{
-        const frKey=pair[0]==='fr0'?'r0m0':'r0m1';
-        const frSt=cfg.matchResults[frKey]||{};
-        topTeam=st.top||(frSt.winner==='top'?frSt.top:frSt.winner==='bot'?frSt.bot:'FR Winner');
-      }
-      // Bottom slot
-      if(typeof pair[1]==='number'){
-        botTeam=st.bot||(slots[pair[1]]?slots[pair[1]].team:'TBD');
-      }else{
-        const frKey=pair[1]==='fr1'?'r0m1':'r0m0';
-        const frSt=cfg.matchResults[frKey]||{};
-        botTeam=st.bot||(frSt.winner==='top'?frSt.top:frSt.winner==='bot'?frSt.bot:'FR Winner');
-      }
-      qfRnd.push([
-        {seed:typeof pair[0]==='number'?slots[pair[0]]?.seed:'',team:topTeam,score:st.topScore??null,winner:st.winner==='top'},
-        {seed:typeof pair[1]==='number'?slots[pair[1]]?.seed:'',team:botTeam,score:st.botScore??null,winner:st.winner==='bot'}
-      ]);
+    // Override with stored QF results if present
+    qf.forEach(qm=>{
+      const st=cfg.matchResults[qm.key]||{};
+      if(st.top) qm.top={...qm.top,team:st.top,score:st.topScore??null,winner:st.winner==='top'};
+      if(st.bot) qm.bot={...qm.bot,team:st.bot,score:st.botScore??null,winner:st.winner==='bot'};
+      if(st.winner==='top') qm.top.winner=true;
+      if(st.winner==='bot') qm.bot.winner=true;
     });
-    allRounds.push(qfRnd);
 
-    // Semifinals: 4 QF winners = 2 games
-    const sfRnd=[];
-    for(let m=0;m<2;m++){
-      const key=`r2m${m}`;
-      const st=cfg.matchResults[key]||{};
-      sfRnd.push([
-        {seed:'',team:st.top||'TBD',score:st.topScore??null,winner:st.winner==='top'},
-        {seed:'',team:st.bot||'TBD',score:st.botScore??null,winner:st.winner==='bot'}
-      ]);
+    // SF
+    const sf0=cfg.matchResults['r2m0']||{};
+    const sf1=cfg.matchResults['r2m1']||{};
+    // Finals
+    const fin=cfg.matchResults['r3m0']||{};
+
+    const rInfo=rounds;
+    const mkSlot=(sl,clickKey,ri,mi)=>{
+      const wc=sl.winner?'winner':'';
+      const ec=isAdmin?'editable':'';
+      const sc=sl.score!=null?`<span class="bracket-score">${sl.score}</span>`:'';
+      const oc=isAdmin&&clickKey?`onclick="openMatchEdit('${cls}','${clickKey}',${ri},${mi})"`:'';
+      return`<div class="bracket-slot ${wc} ${ec}" ${oc}><span class="bracket-seed">${sl.seed||''}</span><span class="bracket-team">${sl.team||'TBD'}</span>${sc}</div>`;
+    };
+    const mkFRSlot=(sl,clickKey,ri,mi)=>{
+      const wc=sl.winner?'winner':'';
+      const ec=isAdmin?'editable':'';
+      const sc=sl.score!=null?`<span class="bracket-score">${sl.score}</span>`:'';
+      const oc=isAdmin&&clickKey?`onclick="openMatchEdit('${cls}','${clickKey}',${ri},${mi})"`:'';
+      return`<div class="bracket-slot ${wc} ${ec}" style="background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.3)" ${oc}><span class="bracket-seed">${sl.seed||''}</span><span class="bracket-team">${sl.team||'TBD'}</span>${sc}</div>`;
+    };
+
+    // Build custom HTML layout
+    const roundTitleStyle=`font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--gray);text-align:center;padding:6px 0 10px`;
+
+    let html=`<div class="bracket-wrap"><div style="display:flex;gap:0;align-items:stretch;min-width:700px">`;
+
+    // First Round column (aligned: 8v9 at top, 7v10 at bottom)
+    const frInfo=rInfo[0]||{name:'First Round',date:'',venue:''};
+    html+=`<div style="display:flex;flex-direction:column;min-width:170px;flex-shrink:0">
+      <div style="${roundTitleStyle}">${frInfo.name}<br><small style="font-size:10px;font-weight:400">${frInfo.date||''}</small><br><small style="font-size:10px;color:var(--blue-lt)">${frInfo.venue||''}</small></div>
+      <div style="display:flex;flex-direction:column;height:100%;justify-content:space-between;padding:6px 6px">`;
+    // 8v9 at top
+    html+=`<div class="bracket-match" style="margin-bottom:0">`;
+    html+=mkFRSlot({seed:s89[0]?.seed,team:s89[0]?.team||'TBD',score:fr0.topScore??null,winner:fr0.winner==='top'},'r0m0',0,0);
+    html+=mkFRSlot({seed:s89[1]?.seed,team:s89[1]?.team||'TBD',score:fr0.botScore??null,winner:fr0.winner==='bot'},'r0m0',0,0);
+    html+=`</div>`;
+    // spacer
+    html+=`<div style="flex:1"></div>`;
+    // 7v10 at bottom
+    html+=`<div class="bracket-match" style="margin-top:0">`;
+    html+=mkFRSlot({seed:s710[0]?.seed,team:s710[0]?.team||'TBD',score:fr1.topScore??null,winner:fr1.winner==='top'},'r0m1',0,1);
+    html+=mkFRSlot({seed:s710[1]?.seed,team:s710[1]?.team||'TBD',score:fr1.botScore??null,winner:fr1.winner==='bot'},'r0m1',0,1);
+    html+=`</div>`;
+    html+=`</div></div>`;
+
+    // connector
+    html+=`<div style="display:flex;align-items:center;width:14px;flex-shrink:0"></div>`;
+
+    // QF column
+    const qfInfo=rInfo[1]||{name:'Quarter Finals',date:'',venue:''};
+    html+=`<div style="display:flex;flex-direction:column;min-width:180px;flex-shrink:0">
+      <div style="${roundTitleStyle}">${qfInfo.name}<br><small style="font-size:10px;font-weight:400">${qfInfo.date||''}</small><br><small style="font-size:10px;color:var(--blue-lt)">${qfInfo.venue||''}</small></div>
+      <div style="display:flex;flex-direction:column;justify-content:space-around;flex:1;padding:6px 6px;gap:6px">`;
+    qf.forEach((qm,mi)=>{
+      html+=`<div class="bracket-match">`;
+      html+=mkSlot({...qm.top},qm.key,1,mi);
+      html+=mkSlot({...qm.bot},qm.key,1,mi);
+      html+=`</div>`;
+    });
+    html+=`</div></div>`;
+
+    // connector
+    html+=`<div style="display:flex;align-items:center;width:14px;flex-shrink:0"></div>`;
+
+    // SF column
+    const sfInfo=rInfo[2]||{name:'Semifinals',date:'',venue:''};
+    html+=`<div style="display:flex;flex-direction:column;min-width:180px;flex-shrink:0">
+      <div style="${roundTitleStyle}">${sfInfo.name}<br><small style="font-size:10px;font-weight:400">${sfInfo.date||''}</small><br><small style="font-size:10px;color:var(--blue-lt)">${sfInfo.venue||''}</small></div>
+      <div style="display:flex;flex-direction:column;justify-content:space-around;flex:1;padding:6px 6px;gap:6px">`;
+    [[sf0,'r2m0',2,0],[sf1,'r2m1',2,1]].forEach(([st,key,ri,mi])=>{
+      html+=`<div class="bracket-match">`;
+      html+=mkSlot({team:st.top||'TBD',score:st.topScore??null,winner:st.winner==='top'},key,ri,mi);
+      html+=mkSlot({team:st.bot||'TBD',score:st.botScore??null,winner:st.winner==='bot'},key,ri,mi);
+      html+=`</div>`;
+    });
+    html+=`</div></div>`;
+
+    // connector
+    html+=`<div style="display:flex;align-items:center;width:14px;flex-shrink:0"></div>`;
+
+    // Finals column
+    const finInfo=rInfo[3]||{name:'Finals',date:'',venue:''};
+    const champKey='r3m0';
+    html+=`<div style="display:flex;flex-direction:column;min-width:180px;flex-shrink:0">
+      <div style="${roundTitleStyle}">${finInfo.name}<br><small style="font-size:10px;font-weight:400">${finInfo.date||''}</small><br><small style="font-size:10px;color:var(--blue-lt)">${finInfo.venue||''}</small></div>
+      <div style="display:flex;flex-direction:column;justify-content:center;flex:1;padding:6px 6px">
+        <div class="bracket-match final">`;
+    html+=mkSlot({team:fin.top||'TBD',score:fin.topScore??null,winner:fin.winner==='top'},champKey,3,0);
+    html+=mkSlot({team:fin.bot||'TBD',score:fin.botScore??null,winner:fin.winner==='bot'},champKey,3,0);
+    html+=`</div></div></div>`;
+
+    // Champion
+    const champName=fin.winner==='top'?fin.top:fin.winner==='bot'?fin.bot:'';
+    html+=`<div style="display:flex;align-items:center;padding:0 8px;flex-shrink:0">
+      <div class="bracket-champion">🏆<div>
+        <div style="font-size:11px;letter-spacing:2px">${cfg.champion||'Class B Champions'}</div>
+        ${champName?`<div style="font-size:13px;color:var(--text);margin-top:4px;text-transform:none">${champName}</div>`:''}
+      </div></div>
+    </div>`;
+
+    html+=`</div></div>`; // end flex + bracket-wrap
+
+    if(cfg.playinMatch){
+      const pi=cfg.playinMatch;
+      const hasScore=pi.champScore!=null&&pi.oppScore!=null;
+      html+=`<div style="margin-top:14px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:11px 14px;font-size:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <strong style="color:var(--gold)">⭐ Conf 4 Play-In:</strong>
+        <span>${pi.champTeam} (Conf 4 Champ) vs #${pi.oppSeed} ${pi.oppTeam}</span>
+        ${hasScore?`<span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--gold)">${pi.champScore}–${pi.oppScore}</span>`:''}
+        ${isAdmin?`<button class="btn btn-ol btn-sm" onclick="openPlayinEdit('${cls}')">✏️ Edit</button>`:''}
+      </div>`;
     }
-    allRounds.push(sfRnd);
-
-    // Finals: 1 game
-    const finKey='r3m0';
-    const finSt=cfg.matchResults[finKey]||{};
-    allRounds.push([[
-      {seed:'',team:finSt.top||'TBD',score:finSt.topScore??null,winner:finSt.winner==='top'},
-      {seed:'',team:finSt.bot||'TBD',score:finSt.botScore??null,winner:finSt.winner==='bot'}
-    ]]);
+    return html;
 
   } else {
     // Correct bracket order: 1v8, 4v5, 3v6, 2v7
@@ -2577,7 +2652,8 @@ if(isFirebaseConfigured){
         // If Firebase still has stale team classes, push the corrected data back up once
         const fbJer = (data.teams||[]).find(t=>t.id==='JER');
         const fbFree = (data.teams||[]).find(t=>t.id==='FREE');
-        if((fbJer&&fbJer.cls!=='B')||(fbFree&&fbFree.cls!=='A')){
+        const fbMer = (data.teams||[]).find(t=>t.id==='MER');
+        if((fbJer&&fbJer.cls!=='B')||(fbFree&&fbFree.cls!=='A')||(fbMer&&fbMer.name!=='Malverne/East Rockaway')){
           saveState(); // push corrected team data back to Firebase for all visitors
         }
       } else if(!_fbInitialPush) {
