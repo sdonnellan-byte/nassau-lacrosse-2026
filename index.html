@@ -170,7 +170,7 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
 .arccard .ay{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:19px;color:var(--gold);flex-shrink:0}
 .arccard .am{font-size:12px;color:var(--gray);flex:1}
 /* ── FIREBASE STATUS BANNER ── */
-#fb-banner{display:none;align-items:center;justify-content:center;text-align:center;padding:7px 16px;font-size:12px;font-weight:500;border-bottom:1px solid;gap:6px}
+#fb-banner{display:none!important}
 /* ── SETUP GUIDE ── */
 .sg-step{display:flex;gap:12px;margin-bottom:18px;align-items:flex-start}
 .sg-num{width:28px;height:28px;border-radius:50%;background:var(--gold);color:var(--navy);font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
@@ -2587,19 +2587,7 @@ const FIREBASE_CONFIG = {
 
 // ── FIREBASE STATUS BANNER ────────────────────────────────────────────────
 function setFBBanner(status){
-  const b=document.getElementById('fb-banner');
-  if(!b)return;
-  if(status==='connected'){
-    b.style.background='rgba(16,185,129,.12)';b.style.borderColor='rgba(16,185,129,.4)';b.style.color='#6ee7b7';
-    b.innerHTML='🟢 <strong>Live</strong> — scores update in real time for all visitors';
-  }else if(status==='local'){
-    b.style.background='rgba(249,115,22,.1)';b.style.borderColor='rgba(249,115,22,.35)';b.style.color='#fcd34d';
-    b.innerHTML='🟡 <strong>Local mode</strong> — Firebase not connected yet. <a href="#" onclick="openSetupGuide();return false;" style="color:inherit;font-weight:700">Click here to set up live sync →</a>';
-  }else if(status==='error'){
-    b.style.background='rgba(239,68,68,.1)';b.style.borderColor='rgba(239,68,68,.3)';b.style.color='#fca5a5';
-    b.innerHTML='🔴 <strong>Connection error</strong> — working in local mode. <a href="#" onclick="openSetupGuide();return false;" style="color:inherit;font-weight:700">Setup help →</a>';
-  }
-  b.style.display='flex';
+  // Banner removed — Firebase status is not displayed to visitors
 }
 
 // ── SETUP GUIDE MODAL ─────────────────────────────────────────────────────
