@@ -914,7 +914,9 @@ function saveState(){
       archives:state.archives||[],
       playoffSpots:state.playoffSpots||DEFAULT_PLAYOFF_SPOTS,
       brackets:state.brackets||{},
-      messages:state.messages||[]
+      messages:state.messages||[],
+      playinDate:state.playinDate||'Tuesday, May 14, 2026',
+      playinVenue:state.playinVenue||'@ Higher Seed'
     }).catch(e=>console.error('Firebase save error:',e));
   }
 }
@@ -926,9 +928,19 @@ if(!state.archives)state.archives=[];
 if(!state.playoffSpots)state.playoffSpots={...DEFAULT_PLAYOFF_SPOTS};
 if(!state.brackets)state.brackets=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG));
 if(!state.messages)state.messages=[];
+if(!state.playinDate)state.playinDate='Tuesday, May 14, 2026';
+if(!state.playinVenue)state.playinVenue='@ Higher Seed';
+
+// Clean up bogus archives: remove auto-archived entries that have 0 games played
+// These are created when restoring a season and should never show in the public archive list
+const _beforeClean=state.archives.length;
+state.archives=state.archives.filter(a=>!(a._autoArchived&&a.gamesPlayed===0));
+if(state.archives.length!==_beforeClean){
+  // Something was cleaned — save back so Firebase gets the fix too
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+}
 
 // If local state has no played games, wipe localStorage so Firebase always wins on fresh load
-// This prevents an empty local cache from blocking real data from appearing
 const _localPlayed=(state.games||[]).filter(g=>g.played).length;
 if(_localPlayed===0){try{localStorage.removeItem(SK);}catch(e){}}
 
@@ -1486,17 +1498,29 @@ function restoreArchive(idx){
 }
 
 function openArcList(){
-  const arcs=state.archives||[];
+  // Only show real completed seasons in the public view:
+  // Must have games played, year must be strictly less than the current live season year,
+  // and must not be an auto-archived placeholder
+  const currentYear=state.year||2026;
+  const arcs=(state.archives||[]).filter(a=>
+    !a._autoArchived &&
+    (a.gamesPlayed||0) > 0 &&
+    (a.year||0) < currentYear
+  );
   const body=document.getElementById('arc-modal-body');
   document.getElementById('arc-modal-title').textContent='📦 Season Archives';
   if(!arcs.length){
-    body.innerHTML='<p class="no-res" style="padding:18px 0">No archived seasons yet. Admin → Archive tab to save a season.</p>';
+    body.innerHTML=`<div style="text-align:center;padding:32px 16px">
+      <div style="font-size:40px;margin-bottom:12px">📦</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:16px;text-transform:uppercase;letter-spacing:1px;color:var(--text);margin-bottom:8px">No Archived Seasons Yet</div>
+      <div style="font-size:13px;color:var(--gray);max-width:320px;margin:0 auto;line-height:1.5">Completed season standings and results will be stored here at the end of each season for reference.</div>
+    </div>`;
   }else{
-    body.innerHTML=arcs.map((a,i)=>`
+    body.innerHTML=arcs.map((a)=>`
       <div class="arccard">
         <div class="ay">${a.year}</div>
         <div class="am">${a.gamesPlayed} games · Archived ${new Date(a.archivedAt).toLocaleDateString()}<br>${(a.teams||[]).length} teams, ${[...new Set((a.teams||[]).map(t=>t.conf))].length} conferences</div>
-        <button class="btn btn-bl btn-sm" onclick="viewArchive(${i})">📋 View</button>
+        <button class="btn btn-bl btn-sm" onclick="viewArchive(${state.archives.indexOf(a)})">📋 View</button>
       </div>`).join('');
   }
   document.getElementById('arc-ov').classList.remove('hidden');
@@ -2023,11 +2047,23 @@ function renderBracket(cls){
     if(cfg.playinMatch){
       const pi=cfg.playinMatch;
       const hasScore=pi.champScore!=null&&pi.oppScore!=null;
-      html+=`<div style="margin-top:14px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:11px 14px;font-size:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <strong style="color:var(--gold)">⭐ Conf 4 Play-In:</strong>
-        <span>${pi.champTeam} (Conf 4 Champ) vs #${pi.oppSeed} ${pi.oppTeam}</span>
-        ${hasScore?`<span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--gold)">${pi.champScore}–${pi.oppScore}</span>`:''}
-        ${isAdmin?`<button class="btn btn-ol btn-sm" onclick="openPlayinEdit('${cls}')">✏️ Edit</button>`:''}
+      const piDate=state.playinDate||'Tuesday, May 14, 2026';
+      const piVenue=state.playinVenue||'@ Higher Seed';
+      html+=`<div style="margin-top:14px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:13px 16px;font-size:12px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+          <strong style="color:var(--gold);font-size:13px">⭐ Conf 4 Play-In Game</strong>
+          <span style="color:var(--gray)">·</span>
+          <span style="color:var(--text-dim)">${piDate}</span>
+          <span style="color:var(--blue-lt)">${piVenue}</span>
+          ${isAdmin?`<button class="btn btn-ol btn-sm" onclick="editPlayinInfo()">✏️ Edit Date/Location</button>`:''}
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span><strong>${pi.champTeam}</strong> <span style="color:var(--gray);font-size:11px">(Conf 4 Champ)</span></span>
+          <span style="color:var(--gold);font-weight:700">vs</span>
+          <span><strong>#${pi.oppSeed} ${pi.oppTeam}</strong></span>
+          ${hasScore?`<span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--gold);font-size:16px">${pi.champScore}–${pi.oppScore}</span>`:''}
+          ${isAdmin?`<button class="btn btn-ol btn-sm" onclick="openPlayinEdit('${cls}')">✏️ Edit Score</button>`:''}
+        </div>
       </div>`;
     }
     return html;
@@ -2117,11 +2153,23 @@ function renderBracket(cls){
   if(cfg.playinMatch){
     const pi=cfg.playinMatch;
     const hasScore=pi.champScore!=null&&pi.oppScore!=null;
-    html+=`<div style="margin-top:14px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:11px 14px;font-size:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <strong style="color:var(--gold)">⭐ Conf 4 Play-In:</strong>
-      <span>${pi.champTeam} (Conf 4 Champ) vs #${pi.oppSeed} ${pi.oppTeam}</span>
-      ${hasScore?`<span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--gold)">${pi.champScore}–${pi.oppScore}</span>`:''}
-      ${isAdmin?`<button class="btn btn-ol btn-sm" onclick="openPlayinEdit('${cls}')">✏️ Edit</button>`:''}
+    const piDate=state.playinDate||'Tuesday, May 14, 2026';
+    const piVenue=state.playinVenue||'@ Higher Seed';
+    html+=`<div style="margin-top:14px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:13px 16px;font-size:12px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+        <strong style="color:var(--gold);font-size:13px">⭐ Conf 4 Play-In Game</strong>
+        <span style="color:var(--gray)">·</span>
+        <span style="color:var(--text-dim)">${piDate}</span>
+        <span style="color:var(--blue-lt)">${piVenue}</span>
+        ${isAdmin?`<button class="btn btn-ol btn-sm" onclick="editPlayinInfo()">✏️ Edit Date/Location</button>`:''}
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span><strong>${pi.champTeam}</strong> <span style="color:var(--gray);font-size:11px">(Conf 4 Champ)</span></span>
+        <span style="color:var(--gold);font-weight:700">vs</span>
+        <span><strong>#${pi.oppSeed} ${pi.oppTeam}</strong></span>
+        ${hasScore?`<span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--gold);font-size:16px">${pi.champScore}–${pi.oppScore}</span>`:''}
+        ${isAdmin?`<button class="btn btn-ol btn-sm" onclick="openPlayinEdit('${cls}')">✏️ Edit Score</button>`:''}
+      </div>
     </div>`;
   }
   return html;
@@ -2232,8 +2280,17 @@ function renderBlankBracket(cls){
   html+=`</div></div>`;
   const champ=getConf4ChampForClass(cls);
   if(champ){
-    html+=`<div style="margin-top:14px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:11px 14px;font-size:12px;color:var(--gray);font-style:italic">
-      ⭐ <strong style="color:var(--gold)">Conf 4 Play-In game will appear here</strong> when bracket is published.
+    const piDate=state.playinDate||'Tuesday, May 14, 2026';
+    const piVenue=state.playinVenue||'@ Higher Seed';
+    html+=`<div style="margin-top:14px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:13px 16px;font-size:12px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:5px">
+        <strong style="color:var(--gold);font-size:13px">⭐ Conf 4 Play-In Game</strong>
+        <span style="color:var(--gray)">·</span>
+        <span style="color:var(--text-dim)">${piDate}</span>
+        <span style="color:var(--blue-lt)">${piVenue}</span>
+        ${isAdmin?`<button class="btn btn-ol btn-sm" onclick="editPlayinInfo()">✏️ Edit Date/Location</button>`:''}
+      </div>
+      <div style="color:var(--gray);font-style:italic;font-size:12px">Conference 4 champion vs the last playoff seed in their class — teams to be determined by end of regular season.</div>
     </div>`;
   }
   return html;
@@ -2361,12 +2418,25 @@ function openMatchEdit(cls,key,ri,mi){
 function openPlayinEdit(cls){
   if(!isAdmin)return;initBrackets();
   const pi=state.brackets[cls].playinMatch;if(!pi)return;
-  const cs=prompt(`${pi.champTeam} (Conf 4 Champ) score:`,pi.champScore??'');if(cs===null)return;
+  const cs=prompt(`${pi.champTeam} (Conf 4 Champ) score (leave blank if not played):`,pi.champScore??'');if(cs===null)return;
   const os=prompt(`${pi.oppTeam} (#${pi.oppSeed}) score:`,pi.oppScore??'');if(os===null)return;
   pi.champScore=cs.trim()===''?null:parseInt(cs);
   pi.oppScore=os.trim()===''?null:parseInt(os);
   if(pi.champScore!=null&&pi.oppScore!=null) pi.winnerId=pi.champScore>pi.oppScore?'champ':'opp';
   saveState();renderPlayoffsTab();showToast('✓ Play-in result saved');
+}
+
+function editPlayinInfo(){
+  if(!isAdmin)return;
+  const newDate=prompt('Play-In Game Date:',state.playinDate||'Tuesday, May 14, 2026');
+  if(newDate===null)return;
+  const newVenue=prompt('Play-In Game Location:',state.playinVenue||'@ Higher Seed');
+  if(newVenue===null)return;
+  state.playinDate=newDate.trim()||'Tuesday, May 14, 2026';
+  state.playinVenue=newVenue.trim()||'@ Higher Seed';
+  saveState();renderPlayoffsTab();
+  if(isAdmin)renderBracketAdminControls();
+  showToast('✓ Play-in info updated');
 }
 
 function renderAll(){
@@ -2630,10 +2700,26 @@ if(isFirebaseConfigured){
         state.games = mergeGames(makeSchedule(), migrateGameIds(data.games||[]));
         state.pending = data.pending||[];
         state.year = data.year||state.year;
-        state.archives = data.archives||[];
+        const _rawArcs=data.archives||[];
+        const _cleanArcs=_rawArcs.filter(a=>!(a._autoArchived&&a.gamesPlayed===0));
+        state.archives = _cleanArcs;
+        if(_cleanArcs.length!==_rawArcs.length){
+          // Stale auto-archives found in Firebase — push fix back so everyone sees clean data
+          setTimeout(()=>saveState(),1000);
+        }
         if(data.playoffSpots){state.playoffSpots=data.playoffSpots;PLAYOFF_SPOTS=state.playoffSpots;}
         if(data.brackets) state.brackets=data.brackets;
         if(data.messages) state.messages=data.messages;
+        // Clean up any stale zero-game archives (e.g. accidental 2027 archive)
+        // This removes them from Firebase so they stop appearing for everyone
+        const liveYear=state.year||2026;
+        const beforeClean=(state.archives||[]).length;
+        state.archives=(state.archives||[]).filter(a=>
+          (a.gamesPlayed||0)>0 || (a.year||0)<liveYear
+        );
+        if(state.archives.length<beforeClean) saveState(); // push cleanup to Firebase
+        if(data.playinDate) state.playinDate=data.playinDate;
+        if(data.playinVenue) state.playinVenue=data.playinVenue;
         try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
         renderAll();
         setFBBanner('connected');
