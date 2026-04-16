@@ -1964,7 +1964,7 @@ function renderBracket(cls){
   const rounds=cfg.rounds||DEFAULT_BRACKET_CONFIG[cls].rounds;
   if(!cfg.matchResults) cfg.matchResults={};
   const size=slots.length;
-  if(!size) return`<p class="no-res">No seeds yet. Admin: click ⚡ Auto-Fill to generate bracket from current standings.</p>`;
+  if(!size) return`<p class="no-res">No seeds yet — brackets auto-populate from current standings when admin opens the Playoffs tab.</p>`;
 
   const byeSeeds=cfg.byeSeeds||(DEFAULT_BRACKET_CONFIG[cls]&&DEFAULT_BRACKET_CONFIG[cls].byeSeeds)||0;
   const allRounds=[];
@@ -2367,10 +2367,8 @@ function renderBlankBracket(cls){
 function renderBracketAdminControls(){
   const el=document.getElementById('bracket-admin-controls');if(!el)return;
   initBrackets();
-  // Auto-sync all brackets from current standings — no manual button needed
-  // This runs every time admin views the playoffs tab, keeping brackets always current
-  ['A','B','C','D'].forEach(cls=>_autoSyncBracket(cls));
-  saveState();
+  // Auto-sync seeds from current standings (preserves match results already entered)
+  try{['A','B','C','D'].forEach(cls=>_autoSyncBracket(cls));}catch(e){console.warn('bracket sync:',e);}
 
   const clsColors={A:'var(--cA)',B:'var(--cB)',C:'var(--cC)',D:'var(--cD)'};
   const clsNames={A:'Class A',B:'Class B',C:'Class C',D:'Class D'};
@@ -2423,6 +2421,8 @@ function renderBracketAdminControls(){
     </div>`;
   });
   el.innerHTML=html;
+  // Save AFTER rendering so Firebase listener re-render doesn't race with innerHTML
+  setTimeout(()=>saveState(),0);
 }
 
 function toggleBracketVisible(cls,val){
