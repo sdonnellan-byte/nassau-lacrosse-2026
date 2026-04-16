@@ -610,7 +610,7 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
   <!-- PLAYOFFS ADMIN -->
   <div class="asub" id="asub-playoffs">
     <div class="stitle">🥍 Playoff Bracket Management</div>
-    <div class="info">Configure and publish playoff brackets. Toggle visibility to show/hide the Playoffs tab from the public. Brackets auto-fill from current class standings. Admin can edit all team slots and scores directly on the bracket.</div>
+    <div class="info">Brackets are automatically seeded from current standings in real time — only you can see them until you toggle a class to <strong>Live</strong>. Toggle visibility to publish each bracket publicly. You can still edit seeds, dates, venues, and match scores directly.</div>
     <div id="bracket-admin-controls"></div>
   </div>
 
@@ -1880,7 +1880,53 @@ function getConf4ChampForClass(cls){
   return{id:champId,name:champ.name};
 }
 
+function _autoSyncBracket(cls){
+  // Silently sync seeds from current standings without wiping entered match results
+  // Called automatically whenever admin opens the playoffs tab
+  initBrackets();
+  const seeds=getBracketSeeds(cls);
+  const cfg=state.brackets[cls];
+  const size=cfg.size||(PLAYOFF_SPOTS[cls]||8);
+
+  // Build updated slots from standings
+  const newSlots=[];
+  for(let i=0;i<size;i++){
+    const s=seeds[i];
+    // Preserve isPlayinSlot flag for last slot if play-in exists
+    const existingSlot=cfg.slots&&cfg.slots[i];
+    newSlots.push({
+      seed:i+1,
+      team:s?(TM[s.id]||{name:'TBD'}).name:'TBD',
+      teamId:s?s.id:null,
+      score:existingSlot?existingSlot.score:null,
+      winner:existingSlot?existingSlot.winner:false
+    });
+  }
+
+  // Update play-in and last slot
+  const champ=getConf4ChampForClass(cls);
+  if(champ){
+    const lastSeed=newSlots[size-1];
+    const existingPI=cfg.playinMatch||{};
+    cfg.playinMatch={
+      champTeam:champ.name,champId:champ.id,champSeed:'C4 Champ',
+      oppTeam:lastSeed?lastSeed.team:'TBD',oppSeed:lastSeed?lastSeed.seed:size,
+      champScore:existingPI.champScore??null,
+      oppScore:existingPI.oppScore??null,
+      winnerId:existingPI.winnerId||null
+    };
+    // Mark last slot as TBA play-in winner
+    newSlots[size-1]={seed:size,team:'TBA — Play-In Winner',teamId:null,score:null,winner:false,isPlayinSlot:true};
+  } else {
+    cfg.playinMatch=null;
+  }
+
+  cfg.slots=newSlots;
+  // Do NOT reset matchResults — preserve any scores admin has already entered
+}
+
 function autoFillBracket(cls){
+  // Full reset fill — clears match results too (kept for manual reset use)
   initBrackets();
   const seeds=getBracketSeeds(cls);
   const cfg=state.brackets[cls];
@@ -1893,18 +1939,14 @@ function autoFillBracket(cls){
   const champ=getConf4ChampForClass(cls);
   if(champ){
     const lastSeed=cfg.slots[size-1];
-    // Store the original last-seeded team as the opponent in the play-in info
-    // But mark the last bracket slot as TBA — it belongs to the play-in winner
     cfg.playinMatch={
       champTeam:champ.name,champId:champ.id,champSeed:'C4 Champ',
       oppTeam:lastSeed?lastSeed.team:'TBD',oppSeed:lastSeed?lastSeed.seed:size,
       champScore:null,oppScore:null,winnerId:null
     };
-    // Last seed in bracket = TBA (play-in winner fills this spot)
     cfg.slots[size-1]={seed:size,team:'TBA — Play-In Winner',teamId:null,score:null,winner:false,isPlayinSlot:true};
   }else{
     cfg.playinMatch=null;
-    // If a slot was previously marked as play-in, restore it from seeds
     if(cfg.slots[size-1]&&cfg.slots[size-1].isPlayinSlot){
       const s=seeds[size-1];
       cfg.slots[size-1]={seed:size,team:s?(TM[s.id]||{name:'TBD'}).name:'TBD',teamId:s?s.id:null,score:null,winner:false};
@@ -2325,6 +2367,11 @@ function renderBlankBracket(cls){
 function renderBracketAdminControls(){
   const el=document.getElementById('bracket-admin-controls');if(!el)return;
   initBrackets();
+  // Auto-sync all brackets from current standings — no manual button needed
+  // This runs every time admin views the playoffs tab, keeping brackets always current
+  ['A','B','C','D'].forEach(cls=>_autoSyncBracket(cls));
+  saveState();
+
   const clsColors={A:'var(--cA)',B:'var(--cB)',C:'var(--cC)',D:'var(--cD)'};
   const clsNames={A:'Class A',B:'Class B',C:'Class C',D:'Class D'};
   let html='';
@@ -2355,7 +2402,6 @@ function renderBracketAdminControls(){
         </div>`).join('')}
       </div>
       <div class="brc-actions">
-        <button class="btn btn-ok btn-sm" onclick="autoFillBracket('${cls}');renderBracketAdminControls();renderPlayoffsTab();showToast('✓ ${clsNames[cls]} auto-filled from standings')">⚡ Auto-Fill Seeds</button>
         <button class="btn btn-bl btn-sm" onclick="adminPreviewBracket('${cls}')">👁 Preview Bracket</button>
         <button class="btn btn-d btn-sm" onclick="resetBracket('${cls}')">🗑 Reset</button>
       </div>
