@@ -1893,10 +1893,23 @@ function autoFillBracket(cls){
   const champ=getConf4ChampForClass(cls);
   if(champ){
     const lastSeed=cfg.slots[size-1];
-    cfg.playinMatch={champTeam:champ.name,champId:champ.id,champSeed:'C4 Champ',
+    // Store the original last-seeded team as the opponent in the play-in info
+    // But mark the last bracket slot as TBA — it belongs to the play-in winner
+    cfg.playinMatch={
+      champTeam:champ.name,champId:champ.id,champSeed:'C4 Champ',
       oppTeam:lastSeed?lastSeed.team:'TBD',oppSeed:lastSeed?lastSeed.seed:size,
-      champScore:null,oppScore:null,winnerId:null};
-  }else{cfg.playinMatch=null;}
+      champScore:null,oppScore:null,winnerId:null
+    };
+    // Last seed in bracket = TBA (play-in winner fills this spot)
+    cfg.slots[size-1]={seed:size,team:'TBA — Play-In Winner',teamId:null,score:null,winner:false,isPlayinSlot:true};
+  }else{
+    cfg.playinMatch=null;
+    // If a slot was previously marked as play-in, restore it from seeds
+    if(cfg.slots[size-1]&&cfg.slots[size-1].isPlayinSlot){
+      const s=seeds[size-1];
+      cfg.slots[size-1]={seed:size,team:s?(TM[s.id]||{name:'TBD'}).name:'TBD',teamId:s?s.id:null,score:null,winner:false};
+    }
+  }
   cfg.matchResults={};
   saveState();
 }
@@ -1922,21 +1935,25 @@ function renderBracket(cls){
     const s710=[ft[0],ft[3]]; // #7 vs #10
     const fr0=cfg.matchResults['r0m0']||{}; // 8v9 result
     const fr1=cfg.matchResults['r0m1']||{}; // 7v10 result
-    const fr0winner=fr0.winner==='top'?fr0.top:fr0.winner==='bot'?fr0.bot:'FR Winner';
-    const fr1winner=fr1.winner==='top'?fr1.top:fr1.winner==='bot'?fr1.bot:'FR Winner';
+    const fr0winner=fr0.winner==='top'?fr0.top:fr0.winner==='bot'?fr0.bot:'TBA';
+    const fr1winner=fr1.winner==='top'?fr1.top:fr1.winner==='bot'?fr1.bot:'TBA';
 
     // QF matchups
     const qf=[
-      {key:'r1m0',top:{seed:slots[0]?.seed,team:slots[0]?.team||'TBD'},bot:{seed:'',team:fr0.winner?fr0winner:'FR Winner'},frGame:'top'},
+      {key:'r1m0',top:{seed:slots[0]?.seed,team:slots[0]?.team||'TBD'},bot:{seed:'',team:'TBA — Play-In Winner'},frGame:'top'},
       {key:'r1m1',top:{seed:slots[3]?.seed,team:slots[3]?.team||'TBD'},bot:{seed:slots[4]?.seed,team:slots[4]?.team||'TBD'},frGame:null},
       {key:'r1m2',top:{seed:slots[2]?.seed,team:slots[2]?.team||'TBD'},bot:{seed:slots[5]?.seed,team:slots[5]?.team||'TBD'},frGame:null},
-      {key:'r1m3',top:{seed:slots[1]?.seed,team:slots[1]?.team||'TBD'},bot:{seed:'',team:fr1.winner?fr1winner:'FR Winner'},frGame:'bot'},
+      {key:'r1m3',top:{seed:slots[1]?.seed,team:slots[1]?.team||'TBD'},bot:{seed:'',team:'TBA — Play-In Winner'},frGame:'bot'},
     ];
     // Override with stored QF results if present
     qf.forEach(qm=>{
       const st=cfg.matchResults[qm.key]||{};
-      if(st.top) qm.top={...qm.top,team:st.top,score:st.topScore??null,winner:st.winner==='top'};
-      if(st.bot) qm.bot={...qm.bot,team:st.bot,score:st.botScore??null,winner:st.winner==='bot'};
+      if(st.top){qm.top={...qm.top,team:st.top,score:st.topScore??null,winner:st.winner==='top'};}
+      if(st.bot){
+        // Only override bot if it has an actual team (don't overwrite TBA with empty)
+        const newBot={...qm.bot,team:st.bot,score:st.botScore??null,winner:st.winner==='bot'};
+        qm.bot=newBot;
+      }
       if(st.winner==='top') qm.top.winner=true;
       if(st.winner==='bot') qm.bot.winner=true;
     });
@@ -1953,7 +1970,11 @@ function renderBracket(cls){
       const ec=isAdmin?'editable':'';
       const sc=sl.score!=null?`<span class="bracket-score">${sl.score}</span>`:'';
       const oc=isAdmin&&clickKey?`onclick="openMatchEdit('${cls}','${clickKey}',${ri},${mi})"`:'';
-      return`<div class="bracket-slot ${wc} ${ec}" ${oc}><span class="bracket-seed">${sl.seed||''}</span><span class="bracket-team">${sl.team||'TBD'}</span>${sc}</div>`;
+      const isTBA=sl.team&&sl.team.startsWith('TBA');
+      const teamDisplay=isTBA
+        ?`<span class="bracket-team" style="color:var(--gold);font-style:italic;font-size:11px">${sl.team}</span>`
+        :`<span class="bracket-team">${sl.team||'TBD'}</span>`;
+      return`<div class="bracket-slot ${wc} ${ec}" ${oc}><span class="bracket-seed">${sl.seed||''}</span>${teamDisplay}${sc}</div>`;
     };
     const mkFRSlot=(sl,clickKey,ri,mi)=>{
       const wc=sl.winner?'winner':'';
@@ -2079,10 +2100,9 @@ function renderBracket(cls){
       // Explicit correct order: 1v8, 4v5, 3v6, 2v7
       const matchupOrder=[[0,7],[3,4],[2,5],[1,6]];
       matchupOrder.forEach(([hi,lo])=>{
-        r0.push([
-          slots[hi]||{seed:hi+1,team:'TBD'},
-          slots[lo]||{seed:lo+1,team:'TBD'}
-        ]);
+        const hSlot=slots[hi]||{seed:hi+1,team:'TBD'};
+        const lSlot=slots[lo]||{seed:lo+1,team:'TBD'};
+        r0.push([hSlot,lSlot]);
       });
     } else if(size===4){
       // 1v4, 2v3
@@ -2127,9 +2147,13 @@ function renderBracket(cls){
         const ec=isAdmin?'editable':'';
         const sc=sl.score!=null?`<span class="bracket-score">${sl.score}</span>`:'';
         const oc=isAdmin?`onclick="openMatchEdit('${cls}','${key}',${ri},${mi})"`:''
+        const isPlayin=sl.isPlayinSlot;
+        const teamDisplay=isPlayin
+          ?`<span class="bracket-team" style="color:var(--gold);font-style:italic;font-size:11px">TBA — Play-In Winner</span>`
+          :`<span class="bracket-team">${sl.team||'TBD'}</span>`;
         html+=`<div class="bracket-slot ${wc} ${ec}" ${oc}>
           <span class="bracket-seed">${sl.seed||''}</span>
-          <span class="bracket-team">${sl.team||'TBD'}</span>${sc}
+          ${teamDisplay}${sc}
         </div>`;
       });
       html+=`</div>`;
