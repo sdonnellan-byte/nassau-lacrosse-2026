@@ -2254,29 +2254,67 @@ function renderPlayoffsTab(highlightCls){
   initBrackets();
   const year=state.year||2026;
   const clsColors={A:'var(--cA)',B:'var(--cB)',C:'var(--cC)',D:'var(--cD)'};
+  const piDate=state.playinDate||'Tuesday, May 14, 2026';
+  const piVenue=state.playinVenue||'@ Higher Seed';
 
   let html=`<div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;text-transform:uppercase;letter-spacing:2px;color:var(--gold);margin-bottom:6px;text-align:center">Nassau County ${year} Playoff Brackets</div>`;
   html+=`<p style="text-align:center;font-size:13px;color:var(--gray);margin-bottom:24px">Playoff brackets will be published here when available.</p>`;
+
+  // Track whether any class has a visible play-in match (for bottom display logic)
+  let pendingPlayin=null; // play-in info to show at bottom when not yet in a live bracket
 
   ['A','B','C','D'].forEach(cls=>{
     const cfg=state.brackets[cls];
     const col=clsColors[cls];
     const isHighlight=highlightCls===cls;
-    // Admin sees filled bracket for any class that has slots (preview mode)
-    // Public sees filled bracket only when visible=true
+    // Admin always sees filled bracket; public only when visible=true
     const showFilled=cfg&&cfg.slots&&cfg.slots.length&&(isAdmin||(cfg.visible));
+    // Play-in is "in-bracket" only when the bracket is both filled AND public (or admin viewing)
+    const playinInBracket=showFilled;
+
     html+=`<div style="margin-bottom:32px${isHighlight?';outline:2px solid '+col+';outline-offset:6px;border-radius:8px;padding:8px':''}">
       <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:17px;text-transform:uppercase;letter-spacing:1px;color:${col};margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid ${col};display:flex;align-items:center;gap:10px">
         Nassau County Class "${cls}" Playoff Bracket
         ${isAdmin&&cfg&&cfg.visible?`<span style="font-size:11px;background:rgba(16,185,129,.2);color:var(--green);padding:2px 8px;border-radius:10px;font-weight:700">● LIVE</span>`:isAdmin&&cfg&&cfg.slots&&cfg.slots.length?`<span style="font-size:11px;background:rgba(249,115,22,.15);color:var(--orange);padding:2px 8px;border-radius:10px;font-weight:700">Admin Preview</span>`:''}
       </div>`;
+
     if(showFilled){
       html+=renderBracket(cls);
+      // If this class has a play-in and bracket is live, it's already rendered inside renderBracket
     } else {
       html+=renderBlankBracket(cls);
+      // Check if this class has a pending play-in to show at the bottom
+      // Only for public view — admin sees it inside the bracket
+      if(!isAdmin){
+        const champ=getConf4ChampForClass(cls);
+        if(champ){
+          pendingPlayin={cls,champ,cfg};
+        }
+      }
     }
     html+=`</div>`;
   });
+
+  // For public view: if there's a play-in whose bracket isn't live yet,
+  // show it at the bottom below all class brackets
+  if(!isAdmin&&pendingPlayin){
+    const {cls,champ}=pendingPlayin;
+    const col=clsColors[cls];
+    html+=`<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:24px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:15px;text-transform:uppercase;letter-spacing:1px;color:var(--gold);margin-bottom:12px">⭐ Conference 4 Play-In Game</div>
+      <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:16px 18px;font-size:13px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+          <span style="color:var(--gray)">📅</span>
+          <span style="color:var(--text)">${piDate}</span>
+          <span style="color:var(--blue-lt)">${piVenue}</span>
+        </div>
+        <div style="font-size:13px;color:var(--gray);line-height:1.6">
+          The Conference 4 champion plays a play-in game to earn the final playoff spot in their class bracket.<br>
+          <strong style="color:${col}">Class ${cls}</strong> — <strong style="color:var(--text)">${champ.name}</strong> <span style="color:var(--gray);font-size:11px">(current Conf 4 leader)</span> will play the last seed in Class ${cls} — teams and matchup will appear inside the Class ${cls} bracket once published.
+        </div>
+      </div>
+    </div>`;
+  }
 
   el.innerHTML=html;
 }
@@ -2345,18 +2383,10 @@ function renderBlankBracket(cls){
   html+=`<div style="display:flex;align-items:center;padding:0 8px;flex-shrink:0"><div class="bracket-champion">🏆<div><div style="font-size:11px;letter-spacing:2px">${champion}</div></div></div></div>`;
   html+=`</div></div>`;
   const champ=getConf4ChampForClass(cls);
-  if(champ){
-    const piDate=state.playinDate||'Tuesday, May 14, 2026';
-    const piVenue=state.playinVenue||'@ Higher Seed';
-    html+=`<div style="margin-top:14px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:13px 16px;font-size:12px">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:5px">
-        <strong style="color:var(--gold);font-size:13px">⭐ Conf 4 Play-In Game</strong>
-        <span style="color:var(--gray)">·</span>
-        <span style="color:var(--text-dim)">${piDate}</span>
-        <span style="color:var(--blue-lt)">${piVenue}</span>
-        ${isAdmin?`<button class="btn btn-ol btn-sm" onclick="editPlayinInfo()">✏️ Edit Date/Location</button>`:''}
-      </div>
-      <div style="color:var(--gray);font-style:italic;font-size:12px">Conference 4 champion vs the last playoff seed in their class — teams to be determined by end of regular season.</div>
+  if(champ&&isAdmin){
+    // Admin still sees the note inside the blank bracket section
+    html+=`<div style="margin-top:14px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:11px 14px;font-size:12px;color:var(--gray);font-style:italic">
+      ⭐ <strong style="color:var(--gold)">Conf 4 Play-In game will appear here</strong> when bracket is published.
     </div>`;
   }
   return html;
