@@ -499,6 +499,9 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
 
 <!-- PLAYOFFS -->
 <div id="panel-playoffs" class="panel">
+  <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+    <button class="btn btn-ol btn-sm" onclick="downloadBracketsPDF()" title="Download playoff brackets as PDF">📄 Download Brackets (PDF)</button>
+  </div>
   <div id="playoffs-content"></div>
 </div>
 
@@ -604,7 +607,7 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
   <!-- PLAYOFFS ADMIN -->
   <div class="asub" id="asub-playoffs">
     <div class="stitle">🥍 Playoff Bracket Management</div>
-    <div class="info">Brackets are automatically seeded from current standings in real time — only you can see them until you toggle a class to <strong>Live</strong>. Toggle visibility to publish each bracket publicly. You can still edit seeds, dates, venues, and match scores directly.</div>
+    <div class="info">Brackets are automatically seeded from current standings in real time — only you can see them until you toggle a class to <strong>Public</strong>. Toggle to publish each bracket publicly. You can still edit seeds, dates, venues, and match scores directly.</div>
     <div id="bracket-admin-controls"></div>
   </div>
 
@@ -2243,6 +2246,138 @@ function adminPreviewBracket(cls){
   showToast(`Previewing Class ${cls} bracket (admin view — not yet public unless toggled Live)`);
 }
 
+function downloadBracketsPDF(){
+  initBrackets();
+  const year=state.year||2026;
+  const clsColors={A:'#f97316',B:'#3b82f6',C:'#10b981',D:'#a855f7'};
+  const clsNames={A:'Class A',B:'Class B',C:'Class C',D:'Class D'};
+  const piDate=state.playinDate||'Tuesday, May 14, 2026';
+  const piVenue=state.playinVenue||'@ Higher Seed';
+
+  // Build bracket rows for each class
+  function makeBracketRows(cls){
+    const cfg=state.brackets[cls];
+    const slots=cfg&&cfg.slots||[];
+    const size=slots.length;
+    const byeSeeds=cfg&&cfg.byeSeeds||(DEFAULT_BRACKET_CONFIG[cls]&&DEFAULT_BRACKET_CONFIG[cls].byeSeeds)||0;
+    const rounds=cfg&&cfg.rounds||DEFAULT_BRACKET_CONFIG[cls].rounds;
+    const isPublic=cfg&&cfg.visible&&size>0;
+    const col=clsColors[cls];
+
+    let html=`<div style="margin-bottom:28px;page-break-inside:avoid">
+      <div style="font-family:Arial,sans-serif;font-weight:900;font-size:14px;text-transform:uppercase;letter-spacing:1px;color:${col};border-bottom:2px solid ${col};padding-bottom:6px;margin-bottom:10px">
+        Nassau County Class "${cls}" Playoff Bracket
+        ${isPublic?'':'<span style="font-size:10px;color:#888;font-weight:400;letter-spacing:0"> — bracket not yet published</span>'}
+      </div>`;
+
+    if(isPublic){
+      // Filled bracket table
+      html+=`<table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:11px;width:100%">`;
+      html+=`<tr>`;
+      rounds.forEach(r=>{
+        html+=`<th style="text-align:center;padding:4px 8px;font-size:10px;color:#555;font-weight:700;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">${r.name}<br><span style="font-weight:400;font-size:9px">${r.date||''}</span></th>`;
+        html+=`<th style="width:16px"></th>`;
+      });
+      html+=`<th style="width:80px"></th></tr>`;
+      // Seeds
+      if(byeSeeds>0){
+        // Class B: FR games + QF with byes
+        const ft=slots.slice(byeSeeds);
+        const fr=[{top:ft[1],bot:ft[2]},{top:ft[0],bot:ft[3]}]; // 8v9, 7v10
+        const qf=[
+          {top:slots[0],bot:{team:'TBA'}},
+          {top:slots[3],bot:slots[4]},
+          {top:slots[2],bot:slots[5]},
+          {top:slots[1],bot:{team:'TBA'}}
+        ];
+        const sf=[{top:{team:'TBD'},bot:{team:'TBD'}},{top:{team:'TBD'},bot:{team:'TBD'}}];
+        const fin={top:{team:'TBD'},bot:{team:'TBD'}};
+        const mkRow=(sl)=>`<div style="border:1px solid #ccc;border-radius:3px;padding:3px 6px;margin:1px 0;background:#f9f9f9;font-size:10px">
+          ${sl.seed?`<span style="color:${col};font-weight:700;margin-right:4px">${sl.seed}</span>`:''}${sl.team||'TBD'}</div>`;
+        html+=`<tr><td style="vertical-align:top;padding:2px 6px">
+          ${fr.map(m=>mkRow(m.top)+mkRow(m.bot)+'<div style="height:8px"></div>').join('')}
+        </td><td></td>
+        <td style="vertical-align:top;padding:2px 6px">
+          ${qf.map(m=>mkRow(m.top)+mkRow(m.bot)+'<div style="height:6px"></div>').join('')}
+        </td><td></td>
+        <td style="vertical-align:top;padding:2px 6px">
+          ${sf.map(m=>mkRow(m.top)+mkRow(m.bot)+'<div style="height:20px"></div>').join('')}
+        </td><td></td>
+        <td style="vertical-align:middle;padding:2px 6px">${mkRow(fin.top)+mkRow(fin.bot)}</td><td></td>
+        <td style="vertical-align:middle;text-align:center;font-size:11px;font-weight:700;color:${col}">🏆<br>Champion</td></tr>`;
+      } else {
+        // Standard bracket
+        const mkRow=(sl)=>`<div style="border:1px solid #ccc;border-radius:3px;padding:3px 6px;margin:1px 0;background:#f9f9f9;font-size:10px">
+          ${sl&&sl.seed?`<span style="color:${col};font-weight:700;margin-right:4px">${sl.seed}</span>`:''}${sl&&sl.team||'TBD'}</div>`;
+        const order=size===8?[[0,7],[3,4],[2,5],[1,6]]:size===4?[[0,3],[1,2]]:[];
+        const r1=order.map(([h,l])=>({top:slots[h]||{seed:h+1,team:'TBD'},bot:slots[l]||{seed:l+1,team:'TBD'}}));
+        const numRounds=rounds.length;
+        html+=`<tr>`;
+        html+=`<td style="vertical-align:top;padding:2px 6px">${r1.map(m=>mkRow(m.top)+mkRow(m.bot)+'<div style="height:8px"></div>').join('')}</td><td></td>`;
+        for(let r=1;r<numRounds-1;r++){
+          const cnt=Math.ceil(r1.length/Math.pow(2,r));
+          html+=`<td style="vertical-align:middle;padding:2px 6px">${Array(cnt).fill(0).map(()=>mkRow({team:'TBD'})+mkRow({team:'TBD'})+'<div style="height:16px"></div>').join('')}</td><td></td>`;
+        }
+        html+=`<td style="vertical-align:middle;padding:2px 6px">${mkRow({team:'TBD'})+mkRow({team:'TBD'})}</td><td></td>`;
+        html+=`<td style="vertical-align:middle;text-align:center;font-size:11px;font-weight:700;color:${col}">🏆<br>Champion</td></tr>`;
+      }
+      html+=`</table>`;
+      // Play-in
+      if(cfg&&cfg.playinMatch){
+        const pi=cfg.playinMatch;
+        html+=`<div style="margin-top:8px;background:#fffbeb;border:1px solid #f59e0b;border-radius:6px;padding:8px 12px;font-size:10px;font-family:Arial,sans-serif">
+          <strong style="color:#b45309">⭐ Conf 4 Play-In:</strong> ${pi.champTeam} (C4 Champ) vs #${pi.oppSeed} ${pi.oppTeam} · ${piDate} · ${piVenue}
+        </div>`;
+      }
+    } else {
+      // Blank bracket — just show round headers and empty slots
+      const mkEmpty=()=>`<div style="border:1px solid #ccc;border-radius:3px;padding:3px 6px;margin:1px 0;background:#f9f9f9;font-size:10px;color:#bbb">TBD</div>`;
+      html+=`<table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:11px;width:100%"><tr>`;
+      rounds.forEach(r=>{
+        html+=`<th style="text-align:center;padding:4px 8px;font-size:10px;color:#555;font-weight:700;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">${r.name}<br><span style="font-weight:400;font-size:9px">${r.date||''}</span></th><th style="width:16px"></th>`;
+      });
+      html+=`<th style="width:80px"></th></tr><tr>`;
+      const size2=cfg&&cfg.size||(PLAYOFF_SPOTS[cls]||8);
+      const half=Math.ceil(size2/2);
+      html+=`<td style="vertical-align:top;padding:2px 6px">${Array(half).fill(0).map(()=>mkEmpty()+mkEmpty()+'<div style="height:8px"></div>').join('')}</td><td></td>`;
+      let cur=half;
+      for(let r=1;r<rounds.length-1;r++){cur=Math.ceil(cur/2);html+=`<td style="vertical-align:middle;padding:2px 6px">${Array(cur).fill(0).map(()=>mkEmpty()+mkEmpty()+'<div style="height:16px"></div>').join('')}</td><td></td>`;}
+      html+=`<td style="vertical-align:middle;padding:2px 6px">${mkEmpty()+mkEmpty()}</td><td></td>`;
+      html+=`<td style="vertical-align:middle;text-align:center;font-size:11px;font-weight:700;color:${col}">🏆<br>Champion</td></tr></table>`;
+    }
+    html+=`</div>`;
+    return html;
+  }
+
+  // Build full print page
+  let body=`
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-family:Arial,sans-serif;font-weight:900;font-size:20px;text-transform:uppercase;letter-spacing:2px;color:#1e293b">Nassau County ${year} Playoff Brackets</div>
+      <div style="font-size:11px;color:#64748b;margin-top:4px">Section VIII Athletics · Girls Lacrosse</div>
+    </div>`;
+  ['A','B','C','D'].forEach(cls=>{body+=makeBracketRows(cls);});
+
+  // Play-in note at bottom if no bracket published
+  const anyPublic=['A','B','C','D'].some(cls=>state.brackets[cls]&&state.brackets[cls].visible);
+  if(!anyPublic){
+    body+=`<div style="margin-top:16px;background:#fffbeb;border:1px solid #f59e0b;border-radius:6px;padding:10px 14px;font-size:11px;font-family:Arial,sans-serif">
+      <strong style="color:#b45309">⭐ Conference 4 Play-In Game</strong> · ${piDate} · ${piVenue}<br>
+      <span style="color:#555">The Conference 4 champion plays a play-in game to earn the final playoff spot in their class bracket.</span>
+    </div>`;
+  }
+
+  const win=window.open('','_blank','width=900,height=700');
+  win.document.write(`<!DOCTYPE html><html><head><title>Nassau County ${year} Playoff Brackets</title>
+    <style>
+      body{margin:24px 32px;font-family:Arial,sans-serif;color:#1e293b}
+      @media print{body{margin:12px 16px}@page{size:landscape;margin:10mm}}
+      table{width:100%}
+    </style>
+  </head><body>${body}</body></html>`);
+  win.document.close();
+  setTimeout(()=>{win.print();},400);
+}
+
 function renderPlayoffsTab(highlightCls){
   const el=document.getElementById('playoffs-content');if(!el)return;
   initBrackets();
@@ -2269,7 +2404,7 @@ function renderPlayoffsTab(highlightCls){
     html+=`<div style="margin-bottom:32px${isHighlight?';outline:2px solid '+col+';outline-offset:6px;border-radius:8px;padding:8px':''}">
       <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:17px;text-transform:uppercase;letter-spacing:1px;color:${col};margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid ${col};display:flex;align-items:center;gap:10px">
         Nassau County Class "${cls}" Playoff Bracket
-        ${isAdmin&&cfg&&cfg.visible?`<span style="font-size:11px;background:rgba(16,185,129,.2);color:var(--green);padding:2px 8px;border-radius:10px;font-weight:700">● LIVE</span>`:isAdmin&&cfg&&cfg.slots&&cfg.slots.length?`<span style="font-size:11px;background:rgba(249,115,22,.15);color:var(--orange);padding:2px 8px;border-radius:10px;font-weight:700">Admin Preview</span>`:''}
+        ${isAdmin&&cfg&&cfg.visible?`<span style="font-size:11px;background:rgba(16,185,129,.2);color:var(--green);padding:2px 8px;border-radius:10px;font-weight:700">● PUBLIC</span>`:isAdmin&&cfg&&cfg.slots&&cfg.slots.length?`<span style="font-size:11px;background:rgba(249,115,22,.15);color:var(--orange);padding:2px 8px;border-radius:10px;font-weight:700">Admin Preview</span>`:''}
       </div>`;
 
     if(showFilled){
@@ -2405,9 +2540,9 @@ function renderBracketAdminControls(){
         <div class="brc-title" style="color:${clsColors[cls]}">${clsNames[cls]} Bracket</div>
         <div style="font-size:12px;color:var(--gray)">${cfg.slots&&cfg.slots.length?cfg.slots.length+' seeds':'No seeds yet'} · ${rounds.length} rounds</div>
         <div class="brc-toggle">
-          <span style="font-size:12px;color:var(--gray)">Public</span>
+          <span style="font-size:12px;color:var(--gray)">Private</span>
           <label class="tog"><input type="checkbox" ${vis?'checked':''} onchange="toggleBracketVisible('${cls}',this.checked)"><span class="tog-sl"></span></label>
-          <span style="font-size:12px;font-weight:700;color:${vis?'var(--green)':'var(--gray)'}">${vis?'Live':'Hidden'}</span>
+          <span style="font-size:12px;font-weight:700;color:${vis?'var(--green)':'var(--gray)'}">Public</span>
         </div>
       </div>
       <div style="font-size:12px;color:var(--gray);margin-bottom:10px">
@@ -2423,8 +2558,6 @@ function renderBracketAdminControls(){
         </div>`).join('')}
       </div>
       <div class="brc-actions">
-        <button class="btn btn-bl btn-sm" onclick="adminPreviewBracket('${cls}')">👁 Preview Bracket</button>
-        <button class="btn btn-d btn-sm" onclick="resetBracket('${cls}')">🗑 Reset</button>
       </div>
       ${cfg.slots&&cfg.slots.length?`<div style="margin-top:12px">
         <div style="font-size:11px;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:700">Seeds (click to edit name)</div>
@@ -2452,7 +2585,7 @@ function toggleBracketVisible(cls,val){
   initBrackets();
   state.brackets[cls].visible=val;
   saveState();renderBracketAdminControls();renderPlayoffsTab();
-  showToast(`Class ${cls} bracket ${val?'is now PUBLIC ✓':'hidden from public'}`,(val?'':'tw'));
+  showToast(`Class ${cls} bracket ${val?'is now PUBLIC ✓':'set to Private'}`,(val?'':'tw'));
 }
 
 function updateBracketSize(cls,val){
