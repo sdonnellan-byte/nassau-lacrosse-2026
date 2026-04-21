@@ -481,6 +481,14 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
     <button class="fbtn" onclick="filterSched('pending',this)">Unplayed</button>
     <button class="fbtn" onclick="filterSched('played',this)">Played</button>
   </div>
+  <div style="margin:8px 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <label style="font-size:12px;color:var(--gray);font-weight:600;white-space:nowrap">🔍 Jump to Team:</label>
+    <select id="sched-team-select" onchange="filterSchedByTeam(this.value)"
+      style="background:var(--navy);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;padding:5px 10px;min-width:200px;cursor:pointer">
+      <option value="">— All Teams —</option>
+    </select>
+    <button class="btn btn-ol btn-sm" onclick="clearTeamFilter()" id="sched-clear-btn" style="display:none">✕ Clear</button>
+  </div>
   <div class="ebar"><button class="btn btn-ol btn-sm" onclick="exportCSV('schedule')">📊 Export to Google Sheets</button></div>
   <div id="sched-list"></div>
 </div>
@@ -512,6 +520,11 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
     <p style="font-size:13px;color:var(--gray);margin-bottom:16px">Have a question or need to reach the administrator? Send a message below and we'll get back to you via email.</p>
     <div class="fg"><label>Your Name *</label><input type="text" id="contact-name" placeholder="Your full name"></div>
     <div class="fg"><label>Your Email Address *</label><input type="email" id="contact-email" placeholder="you@example.com"></div>
+    <!-- Honeypot: hidden from real users, bots will fill this in -->
+    <div style="position:absolute;left:-9999px;top:-9999px;height:0;overflow:hidden" aria-hidden="true">
+      <label>Leave this blank</label>
+      <input type="text" id="contact-honeypot" tabindex="-1" autocomplete="off">
+    </div>
     <div class="fg"><label>Subject</label><input type="text" id="contact-subject" placeholder="e.g. Score dispute, general question..."></div>
     <div class="fg"><label>Message *</label><textarea id="contact-msg" placeholder="Type your message here..." style="min-height:100px"></textarea></div>
     <div id="contact-err" class="em" style="display:none"></div>
@@ -919,7 +932,7 @@ function saveState(){
 }
 
 let state=loadState();
-let isAdmin=false,editGameId=null,schedFilter='all';
+let isAdmin=false,editGameId=null,schedFilter='all',schedTeamFilter='';
 if(!state.pending)state.pending=[];
 if(!state.archives)state.archives=[];
 if(!state.playoffSpots)state.playoffSpots={...DEFAULT_PLAYOFF_SPOTS};
@@ -1649,6 +1662,27 @@ function renderClassStandings(){
 }
 
 // ── RENDER: SCHEDULE ──────────────────────────────────────────────────────
+function filterSchedByTeam(teamId){
+  schedTeamFilter=teamId;
+  const clearBtn=document.getElementById('sched-clear-btn');
+  if(clearBtn) clearBtn.style.display=teamId?'':'none';
+  renderSchedule();
+  // Scroll to first matching game row
+  if(teamId){
+    setTimeout(()=>{
+      const first=document.querySelector('#sched-list .grow.team-match');
+      if(first) first.scrollIntoView({behavior:'smooth',block:'center'});
+    },50);
+  }
+}
+function clearTeamFilter(){
+  schedTeamFilter='';
+  const sel=document.getElementById('sched-team-select');
+  if(sel) sel.value='';
+  const clearBtn=document.getElementById('sched-clear-btn');
+  if(clearBtn) clearBtn.style.display='none';
+  renderSchedule();
+}
 function filterSched(f,el){
   schedFilter=f;
   document.querySelectorAll('#sched-fbar .fbtn').forEach(b=>b.classList.remove('active'));
@@ -1656,16 +1690,34 @@ function filterSched(f,el){
   renderSchedule();
 }
 function renderSchedule(){
+  // Populate team dropdown with all active teams sorted alphabetically
+  const sel=document.getElementById('sched-team-select');
+  if(sel){
+    const current=sel.value;
+    const teams=TEAMS.filter(t=>!t._ph).sort((a,b)=>a.name.localeCompare(b.name));
+    sel.innerHTML='<option value="">— All Teams —</option>'+
+      teams.map(t=>`<option value="${t.id}"${t.id===current?' selected':''}>${t.name}</option>`).join('');
+  }
+
   let games=[...state.games];
-  if(schedFilter==='pending')games=games.filter(g=>!g.played);
-  else if(schedFilter==='played')games=games.filter(g=>g.played);
-  else if(!isNaN(parseInt(schedFilter)))games=games.filter(g=>g.conf==schedFilter);
+  // Apply conf/status filter
+  if(schedFilter==='pending') games=games.filter(g=>!g.played);
+  else if(schedFilter==='played') games=games.filter(g=>g.played);
+  else if(!isNaN(parseInt(schedFilter))) games=games.filter(g=>g.conf==schedFilter);
+  // Apply team filter
+  if(schedTeamFilter) games=games.filter(g=>g.home===schedTeamFilter||g.away===schedTeamFilter);
+
   const c=document.getElementById('sched-list');
-  if(!games.length){c.innerHTML='<p class="no-res">No games match this filter.</p>';return;}
+  if(!c) return;
+  if(!games.length){
+    c.innerHTML=`<p class="no-res">${schedTeamFilter?`No games found for ${(TM[schedTeamFilter]||{name:schedTeamFilter}).name}.`:'No games match this filter.'}</p>`;
+    return;
+  }
   c.innerHTML=games.map(g=>{
     const ht=TM[g.home]||{name:g.home,cls:'?'},at=TM[g.away]||{name:g.away,cls:'?'};
     const sc=g.played?`${g.homeScore}–${g.awayScore}`:'';
-    return`<div class="grow ${g.played?'played':''}">
+    const isMatch=schedTeamFilter&&(g.home===schedTeamFilter||g.away===schedTeamFilter);
+    return`<div class="grow ${g.played?'played':''} ${isMatch?'team-match':''}" ${isMatch?'style="outline:1px solid var(--gold);outline-offset:-1px;border-radius:8px"':''}>
       <div class="dot ${g.played?'on':''}"></div>
       <div><span class="cb ${cClass(g.conf)}">C${g.conf}</span></div>
       <div class="gt">${ht.name} <span style="color:var(--gray)">vs</span> ${at.name}
@@ -1708,9 +1760,12 @@ function submitContact(){
   const email=document.getElementById('contact-email').value.trim();
   const subject=document.getElementById('contact-subject').value.trim();
   const msg=document.getElementById('contact-msg').value.trim();
+  const honeypot=document.getElementById('contact-honeypot').value;
   const err=document.getElementById('contact-err');
   const ok=document.getElementById('contact-ok');
   err.style.display='none';ok.style.display='none';
+  // Honeypot check — bots fill hidden fields, real users never see it
+  if(honeypot){return;} // silently reject, bot doesn't know it was blocked
   if(!name){err.textContent='Please enter your name.';err.style.display='block';return;}
   if(!email||!email.includes('@')){err.textContent='Please enter a valid email address.';err.style.display='block';return;}
   if(!msg){err.textContent='Please enter a message.';err.style.display='block';return;}
