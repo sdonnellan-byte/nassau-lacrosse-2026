@@ -452,7 +452,6 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
   <div class="tab active" data-tab="conf" onclick="switchTab('conf')">🏟 Conference Standings</div>
   <div class="tab" data-tab="class" onclick="switchTab('class')">🏆 Class Standings</div>
   <div class="tab" data-tab="schedule" onclick="switchTab('schedule')">📅 Schedule</div>
-  <div class="tab" data-tab="results" onclick="switchTab('results')">🏁 Recent Results</div>
   <div class="tab" data-tab="playoffs" id="tab-playoffs" onclick="switchTab('playoffs')">🥍 Playoffs</div>
   <div class="tab" data-tab="submit" onclick="switchTab('submit')">📬 Submit Score</div>
   <div class="tab" data-tab="contact" onclick="switchTab('contact')">✉️ Contact</div>
@@ -464,18 +463,13 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
 
 <!-- CONFERENCE STANDINGS -->
 <div id="panel-conf" class="panel active">
-  <div class="leg">
-    <div class="li"><div class="ld" style="background:rgba(26,86,219,.3);border:1px solid #3b82f6"></div>Conf 1 &amp; 2 — all teams qualify for playoffs</div>
-    <div class="li"><div class="ld" style="background:rgba(16,185,129,.2);border:1px solid #10b981"></div>Conf 3 — fills remaining playoff bracket spots by class standing</div>
-    <div class="li"><div class="ld" style="background:rgba(249,115,22,.2);border:1px solid #f97316"></div>Conf 4 — Conference Champion Qualifies for Playoffs</div>
-  </div>
   <div class="ebar"><button class="btn btn-ol btn-sm" onclick="exportCSV('conf')">📊 Export to Google Sheets</button></div>
   <div class="conf-grid" id="conf-standings" style="--nc:4"></div>
 </div>
 
 <!-- CLASS STANDINGS -->
 <div id="panel-class" class="panel">
-  <div class="info">⚠️ <strong>Playoff seeding:</strong> Conf 1 (all) → Conf 2 (all) → Conf 3 (fills remaining spots) → Conf 4 (conference champion qualifies). No lower-conference team can jump a higher-conference team. Ties broken by head-to-head. ⭐ = Conference 4 champion (qualifies for playoffs in their class).</div>
+  <div class="info">⚠️ <strong>Playoff seeding:</strong> Conf 1 &amp; 2 — all teams qualify for playoffs. Conf 3 — fills remaining playoff bracket spots by class standing. Conf 4 — Conference Champion qualifies for playoffs. No lower-conference team can jump a higher-conference team. Ties broken by head-to-head. ⭐ = Conference 4 champion (qualifies for playoffs in their class).</div>
   <div class="ebar"><button class="btn btn-ol btn-sm" onclick="exportCSV('class')">📊 Export to Google Sheets</button></div>
   <div class="class-grid" id="class-standings"></div>
 </div>
@@ -1744,7 +1738,7 @@ function renderMessages(){
       <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:5px">${m.subject}</div>
       <div style="font-size:13px;color:var(--text);line-height:1.5;white-space:pre-wrap">${m.msg}</div>
       <div style="display:flex;gap:8px;margin-top:10px">
-        <a href="mailto:${m.email}?subject=Re: ${encodeURIComponent(m.subject)}" class="btn btn-bl btn-sm">↩ Reply via Email</a>
+        <a href="mailto:${m.email}?subject=Re: ${encodeURIComponent(m.subject||'')}" class="btn btn-bl btn-sm">↩ Reply via Email</a>
         ${!m.read?`<button class="btn btn-ok btn-sm" onclick="markMessageRead(${i})">✓ Mark Read</button>`:''}
         <button class="btn btn-d btn-sm" onclick="deleteMessage(${i})">🗑 Delete</button>
       </div>
