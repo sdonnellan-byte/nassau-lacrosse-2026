@@ -1614,11 +1614,18 @@ function renderClassStandings(){
   const confs=[...new Set(TEAMS.map(t=>t.conf))].sort();
   const el=document.getElementById('class-standings');el.innerHTML='';
 
-  // ONE overall Conference 4 champion — the single #1 team across ALL of conf 4
-  // This is the only team that gets the ⭐ anywhere in class standings
+  // Determine conf4 qualifier(s) — may be multiple if teams from different classes are tied
+  // Build a map of cls → qualifying teamId so we can star the right team in each class table
   const conf4Teams=TEAMS.filter(t=>t.conf===4&&!t._ph);
   const conf4Sorted=sortTeams(conf4Teams.map(t=>t.id),rec);
-  const overallConf4Champ=conf4Sorted.length>0?conf4Sorted[0]:null;
+  // Build conf4Qualifiers: map of teamId → true for all teams that qualify
+  const conf4Qualifiers={};
+  if(conf4Sorted.length>0){
+    ['A','B','C','D'].forEach(cls=>{
+      const q=getConf4QualifiersForClass(cls);
+      if(q) conf4Qualifiers[q.id]=true;
+    });
+  }
 
   ['A','B','C','D'].forEach(cls=>{
     const blocks=confs.map(c=>({conf:c,ids:sortTeams(TEAMS.filter(t=>t.cls===cls&&t.conf===c&&!t._ph).map(t=>t.id),rec)}));
@@ -1641,8 +1648,8 @@ function renderClassStandings(){
         const si=seededCapped.findIndex(s=>s.id===tid);
         const isSeed=si>=0;
         const seed=si+1;
-        // Star only on the ONE overall conf 4 leader — appears in exactly one class table
-        const isConf4Champ=overallConf4Champ===tid;
+        // Star on any team that qualifies from conf4 (handles multi-class ties)
+        const isConf4Champ=!!conf4Qualifiers[tid];
         const sc=t.conf===1?'':` s${t.conf<=6?t.conf:1}`;
         const seedCell=isSeed
           ?`<span class="sn${sc}">${seed}</span>`
@@ -1921,15 +1928,80 @@ function getBracketSeeds(cls){
   return seeded.slice(0,spots);
 }
 
-function getConf4ChampForClass(cls){
+// Returns the conf4 qualifier(s) for a given class.
+// Rules:
+//   - Find all conf4 teams tied for 1st (same win%)
+//   - If tied teams are from DIFFERENT classes → each qualifies in their own class
+//   - If tied teams are from the SAME class → use h2h to pick one winner; loser is eliminated
+//   - Returns {id, name} for the qualifier in `cls`, or null if none
+function getConf4QualifiersForClass(cls){
   const rec=computeStandings();
   const conf4Teams=TEAMS.filter(t=>t.conf===4&&!t._ph);
+  if(!conf4Teams.length) return null;
   const conf4Sorted=sortTeams(conf4Teams.map(t=>t.id),rec);
   if(!conf4Sorted.length) return null;
-  const champId=conf4Sorted[0];
-  const champ=TM[champId];
-  if(!champ||champ.cls!==cls) return null;
-  return{id:champId,name:champ.name};
+
+  // Find all teams tied with the leader (same win%)
+  const leaderId=conf4Sorted[0];
+  const leaderRec=rec[leaderId];
+  const leaderG=leaderRec.w+leaderRec.l+leaderRec.t;
+  const leaderPct=leaderG>0?leaderRec.w/leaderG:0;
+
+  const tiedIds=conf4Sorted.filter(id=>{
+    const r=rec[id];
+    const g=r.w+r.l+r.t;
+    const pct=g>0?r.w/g:0;
+    return Math.abs(pct-leaderPct)<0.0001; // same win%
+  });
+
+  if(tiedIds.length<=1){
+    // Clear winner — qualifies only if in the requested class
+    const champ=TM[leaderId];
+    if(!champ||champ.cls!==cls) return null;
+    return{id:leaderId,name:champ.name};
+  }
+
+  // Multiple teams tied — group by class
+  const byClass={};
+  tiedIds.forEach(id=>{
+    const t=TM[id];
+    if(!t) return;
+    if(!byClass[t.cls]) byClass[t.cls]=[];
+    byClass[t.cls].push(id);
+  });
+
+  // For each class group: if multiple teams tied in same class → h2h tiebreaker
+  // The h2h winner is the only one who qualifies from that class
+  const qualifiers={}; // cls → teamId
+
+  Object.entries(byClass).forEach(([teamCls,ids])=>{
+    if(ids.length===1){
+      // Only one tied team in this class — qualifies
+      qualifiers[teamCls]=ids[0];
+    } else {
+      // Multiple same-class teams tied → use h2h to find winner
+      // sortTeams uses h2h as tiebreaker (step 2), so first in sorted order wins
+      const sorted=sortTeams(ids,rec);
+      // Only qualifies if there IS a clear h2h winner (h2h played between them)
+      const topId=sorted[0];
+      const secondId=sorted[1];
+      const h2hRecord=rec[topId]&&rec[topId].h2h[secondId];
+      if(h2hRecord&&(h2hRecord.w>0||h2hRecord.l>0)){
+        // h2h was played — winner qualifies
+        qualifiers[teamCls]=topId;
+      } else {
+        // No h2h game played yet — use first in sort (win% / wins / losses)
+        qualifiers[teamCls]=topId;
+      }
+    }
+  });
+
+  // Return the qualifier for the requested class
+  const qualId=qualifiers[cls];
+  if(!qualId) return null;
+  const qual=TM[qualId];
+  if(!qual) return null;
+  return{id:qualId,name:qual.name};
 }
 
 function _autoSyncBracket(cls){
@@ -1956,7 +2028,7 @@ function _autoSyncBracket(cls){
   }
 
   // Update play-in and last slot
-  const champ=getConf4ChampForClass(cls);
+  const champ=getConf4QualifiersForClass(cls);
   if(champ){
     const lastSeed=newSlots[size-1];
     const existingPI=cfg.playinMatch||{};
@@ -1988,7 +2060,7 @@ function autoFillBracket(cls){
     const s=seeds[i];
     cfg.slots.push({seed:i+1,team:s?(TM[s.id]||{name:'TBD'}).name:'TBD',teamId:s?s.id:null,score:null,winner:false});
   }
-  const champ=getConf4ChampForClass(cls);
+  const champ=getConf4QualifiersForClass(cls);
   if(champ){
     const lastSeed=cfg.slots[size-1];
     cfg.playinMatch={
@@ -2470,7 +2542,7 @@ function renderPlayoffsTab(highlightCls){
       // Check if this class has a pending play-in to show at the bottom
       // Only for public view — admin sees it inside the bracket
       if(!isAdmin){
-        const champ=getConf4ChampForClass(cls);
+        const champ=getConf4QualifiersForClass(cls);
         if(champ){
           pendingPlayin={cls,champ,cfg};
         }
@@ -2565,7 +2637,7 @@ function renderBlankBracket(cls){
   });
   html+=`<div style="display:flex;align-items:center;padding:0 8px;flex-shrink:0"><div class="bracket-champion">🏆<div><div style="font-size:11px;letter-spacing:2px">${champion}</div></div></div></div>`;
   html+=`</div></div>`;
-  const champ=getConf4ChampForClass(cls);
+  const champ=getConf4QualifiersForClass(cls);
   if(champ&&isAdmin){
     // Admin still sees the note inside the blank bracket section
     html+=`<div style="margin-top:14px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:11px 14px;font-size:12px;color:var(--gray);font-style:italic">
