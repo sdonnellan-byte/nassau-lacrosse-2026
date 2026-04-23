@@ -2805,27 +2805,91 @@ function renderAll(){
 function exportCSV(type){
   const rec=computeStandings();
   const confs=[...new Set(TEAMS.map(t=>t.conf))].sort();
+  const year=state.year||2026;
   let rows=[],name='Nassau_Lacrosse';
+
   if(type==='conf'){
-    rows.push(['Conference','Rank','Team','Class','W','L','T','Pct']);
-    confs.forEach(c=>{sortTeams(TEAMS.filter(t=>t.conf===c&&!t._ph).map(t=>t.id),rec).forEach((tid,i)=>{const r=rec[tid],t=TM[tid];const g=r.w+r.l+r.t;rows.push([c,i+1,t.name,t.cls,r.w,r.l,r.t,g>0?(r.w/g).toFixed(3):'0.000']);});});
+    // Title row
+    rows.push([`Nassau County Girls Lacrosse ${year} — Conference Standings`]);
+    rows.push([]); // blank spacer
+    confs.forEach(c=>{
+      const confTeams=sortTeams(TEAMS.filter(t=>t.conf===c&&!t._ph).map(t=>t.id),rec);
+      if(!confTeams.length)return;
+      // Conference header
+      rows.push([`CONFERENCE ${c}`,'','','','','','','']);
+      // Column headers
+      rows.push(['Rank','Team','Class','W','L','T','Pct','GF-GA']);
+      confTeams.forEach((tid,i)=>{
+        const r=rec[tid],t=TM[tid];
+        const g=r.w+r.l+r.t;
+        rows.push([i+1,t.name,t.cls,r.w,r.l,r.t,g>0?(r.w/g).toFixed(3):'0.000',`${r.gf||0}-${r.ga||0}`]);
+      });
+      rows.push([]); // blank spacer between conferences
+    });
     name='Conference_Standings';
+
   }else if(type==='class'){
-    rows.push(['Class','Seed','Team','Conference','W','L','T','Pct','Playoff']);
+    // Title row
+    rows.push([`Nassau County Girls Lacrosse ${year} — Class Standings`]);
+    rows.push([]);
     ['A','B','C','D'].forEach(cls=>{
-      const all=[];confs.forEach(c=>sortTeams(TEAMS.filter(t=>t.cls===cls&&t.conf===c&&!t._ph).map(t=>t.id),rec).forEach(id=>all.push({id,c})));
-      all.forEach(({id,c},i)=>{const r=rec[id],t=TM[id];const g=r.w+r.l+r.t;rows.push([cls,i+1,t.name,c,r.w,r.l,r.t,g>0?(r.w/g).toFixed(3):'0.000',i<PLAYOFF_SPOTS[cls]?'YES':'NO']);});
-    });name='Class_Standings';
+      const spots=PLAYOFF_SPOTS[cls];
+      // Build all teams in class ordered by conf block
+      const allIds=[];
+      confs.forEach(c=>{
+        sortTeams(TEAMS.filter(t=>t.cls===cls&&t.conf===c&&!t._ph).map(t=>t.id),rec).forEach(id=>allIds.push({id,c}));
+      });
+      if(!allIds.length)return;
+      // Class header
+      rows.push([`CLASS ${cls} — Top ${spots} Qualify for Playoffs`,'','','','','','','']);
+      rows.push(['Seed','Team','Conference','W','L','T','Pct','Playoffs']);
+      // Build seeded list for playoff column
+      const seeded=[];
+      confs.forEach(c=>{
+        sortTeams(TEAMS.filter(t=>t.cls===cls&&t.conf===c&&!t._ph&&c<=3).map(t=>t.id),rec).forEach(id=>seeded.push(id));
+      });
+      const seededCapped=seeded.slice(0,spots);
+      allIds.forEach(({id},idx)=>{
+        const r=rec[id],t=TM[id];
+        if(!r||!t)return;
+        const si=seededCapped.indexOf(id);
+        const seed=si>=0?si+1:'';
+        const g=r.w+r.l+r.t;
+        // Check conf4 qualifier
+        const conf4q=getConf4QualifiersForClass(cls);
+        const isConf4Q=conf4q&&conf4q.id===id;
+        const playoffStatus=si>=0?'YES — Qualifies':isConf4Q?'YES — C4 Play-In':'NO';
+        rows.push([seed,t.name+(isConf4Q?' ⭐':''),`Conf ${t.conf}`,r.w,r.l,r.t,g>0?(r.w/g).toFixed(3):'0.000',playoffStatus]);
+      });
+      rows.push([]); // spacer
+    });
+    name='Class_Standings';
+
   }else{
-    rows.push(['Conference','Home','Away','Home Score','Away Score','Winner','Played']);
-    state.games.forEach(g=>{const ht=TM[g.home]||{name:g.home},at=TM[g.away]||{name:g.away};const w=g.played?(g.homeScore>g.awayScore?ht.name:g.awayScore>g.homeScore?at.name:'Tie'):'';rows.push([g.conf,ht.name,at.name,g.played?g.homeScore:'',g.played?g.awayScore:'',w,g.played?'YES':'NO']);});
+    // Schedule export
+    rows.push([`Nassau County Girls Lacrosse ${year} — Schedule`]);
+    rows.push([]);
+    confs.forEach(c=>{
+      const confGames=state.games.filter(g=>g.conf===c);
+      if(!confGames.length)return;
+      rows.push([`CONFERENCE ${c}`,'','','','','','']);
+      rows.push(['Home Team','Away Team','Home Score','Away Score','Winner','Status']);
+      confGames.forEach(g=>{
+        const ht=TM[g.home]||{name:g.home};
+        const at=TM[g.away]||{name:g.away};
+        const w=g.played?(g.homeScore>g.awayScore?ht.name:g.awayScore>g.homeScore?at.name:'Tie'):'';
+        rows.push([ht.name,at.name,g.played?g.homeScore:'',g.played?g.awayScore:'',w,g.played?'Played':'Unplayed']);
+      });
+      rows.push([]);
+    });
     name='Schedule';
   }
-  const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const blob=new Blob([csv],{type:'text/csv'});
+
+  const csv=rows.map(r=>r.map(v=>`"${String(v===null||v===undefined?'':v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}); // BOM for Excel/Sheets UTF-8
   const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download=`${name}_${state.year||2026}.csv`;a.click();URL.revokeObjectURL(url);
-  showToast('✓ CSV downloaded — File → Import in Google Sheets');
+  const a=document.createElement('a');a.href=url;a.download=`${name}_${year}.csv`;a.click();URL.revokeObjectURL(url);
+  showToast('✓ CSV downloaded — open Google Sheets → File → Import to view');
 }
 
 // ── SHARE ─────────────────────────────────────────────────────────────────
