@@ -627,7 +627,11 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
   <!-- CONFERENCES & TEAMS -->
   <div class="asub" id="asub-conferences">
     <div class="stitle">🏟 New Season Setup — Conferences, Teams &amp; Playoff Spots</div>
-    <div class="info">Use this section to configure each new season. Changes take effect immediately and rebuild the schedule while preserving all existing scores.</div>
+    <div class="info">Use this section to configure each new season. Changes auto-save after each action — look for the <strong style="color:var(--green)">✓ Saved</strong> confirmation or click <strong>💾 Save Now</strong> at any time.</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <button id="conf-save-btn" class="btn btn-ok btn-sm" onclick="saveConfNow()">💾 Save Now</button>
+      <span id="conf-save-status" style="font-size:12px;color:var(--green);display:none">✓ All changes saved</span>
+    </div>
 
     <!-- PLAYOFF QUALIFIERS EDITOR -->
     <div style="background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:18px">
@@ -1277,6 +1281,33 @@ function deleteResult(){
 }
 
 // ── CONFERENCE MANAGER ────────────────────────────────────────────────────
+let _confSaveTimer=null;
+function _debouncedConfSave(){
+  clearTimeout(_confSaveTimer);
+  const btn=document.getElementById('conf-save-btn');
+  const status=document.getElementById('conf-save-status');
+  if(btn){btn.textContent='💾 Save Now';btn.style.background='var(--orange)';btn.style.borderColor='var(--orange)';}
+  if(status) status.style.display='none';
+  _confSaveTimer=setTimeout(()=>{
+    saveState();
+    if(btn){btn.textContent='💾 Save Now';btn.style.background='';btn.style.borderColor='';}
+    if(status){status.textContent='✓ All changes saved';status.style.display='inline';}
+    setTimeout(()=>{if(status) status.style.display='none';},3000);
+  },800);
+}
+function saveConfNow(){
+  clearTimeout(_confSaveTimer);
+  saveState();
+  const btn=document.getElementById('conf-save-btn');
+  const status=document.getElementById('conf-save-status');
+  if(btn){btn.textContent='✓ Saved!';btn.style.background='var(--green)';btn.style.borderColor='var(--green)';}
+  if(status){status.textContent='✓ All changes saved';status.style.display='inline';}
+  setTimeout(()=>{
+    if(btn){btn.textContent='💾 Save Now';btn.style.background='';btn.style.borderColor='';}
+    if(status) status.style.display='none';
+  },2500);
+  showToast('✓ Conference & team settings saved');
+}
 function changeNumConferences(){
   const target=parseInt(document.getElementById('num-conf-sel').value);
   const confs=[...new Set(TEAMS.map(t=>t.conf))].sort();
@@ -1296,7 +1327,7 @@ function changeNumConferences(){
       TEAMS.push({id:pid,name:`[Placeholder — assign teams to Conf ${newConf}]`,conf:newConf,cls:'A',_ph:true});
     showToast(`Conference ${newConf} added. Move teams into it using the dropdowns.`);
   }
-  buildTM();rebuildSchedule();saveState();renderAll();renderConfMgr();initSelects();
+  buildTM();rebuildSchedule();_debouncedConfSave();renderAll();renderConfMgr();initSelects();
 }
 
 function moveTeamToConf(tid,newConf){
@@ -1304,19 +1335,19 @@ function moveTeamToConf(tid,newConf){
   t.conf=parseInt(newConf);
   // Remove placeholder from target if present
   TEAMS=TEAMS.filter(x=>!(x._ph&&x.conf===parseInt(newConf)&&x.id!==tid));
-  buildTM();rebuildSchedule();saveState();renderAll();renderConfMgr();initSelects();
+  buildTM();rebuildSchedule();_debouncedConfSave();renderAll();renderConfMgr();initSelects();
   showToast(`${t.name} → Conference ${newConf}`);
 }
 function changeTeamClass(tid,cls){
   const t=TEAMS.find(x=>x.id===tid);if(!t)return;
-  t.cls=cls;buildTM();saveState();renderAll();showToast(`${t.name} → Class ${cls}`);
+  t.cls=cls;buildTM();_debouncedConfSave();renderAll();showToast(`${t.name} → Class ${cls}`);
 }
 function removeTeam(tid){
   const t=TEAMS.find(x=>x.id===tid);if(!t)return;
   if(!confirm(`Remove "${t.name}"?`))return;
   TEAMS=TEAMS.filter(x=>x.id!==tid);
   state.games=state.games.filter(g=>g.home!==tid&&g.away!==tid);
-  buildTM();saveState();renderAll();renderConfMgr();initSelects();
+  buildTM();_debouncedConfSave();renderAll();renderConfMgr();initSelects();
   showToast(`${t.name} removed`,'tw');
 }
 function addNewTeam(){
@@ -1327,7 +1358,7 @@ function addNewTeam(){
   if(!name){err.textContent='Enter a team name.';err.style.display='block';return;}
   const id='T'+Date.now();
   TEAMS.push({id,name,conf,cls});
-  buildTM();rebuildSchedule();saveState();renderAll();renderConfMgr();initSelects();
+  buildTM();rebuildSchedule();_debouncedConfSave();renderAll();renderConfMgr();initSelects();
   document.getElementById('nt-name').value='';
   showToast(`✓ ${name} added to Conference ${conf}`);
 }
@@ -1404,8 +1435,8 @@ function updatePlayoffSpot(cls,val){
   if(isNaN(n)||n<1||n>30){showToast('Enter a number between 1 and 30','tw');return;}
   state.playoffSpots[cls]=n;
   PLAYOFF_SPOTS=state.playoffSpots;
-  saveState();renderAll();renderConfMgr();
-  showToast(`✓ Class ${cls} playoff spots updated to ${n}`);
+  _debouncedConfSave();renderAll();renderConfMgr();
+  showToast(`✓ Class ${cls} playoff spots → ${n}`);
 }
 
 function archiveSeason(){
@@ -2685,6 +2716,7 @@ function renderBracketAdminControls(){
         </div>`).join('')}
       </div>
       <div class="brc-actions">
+        <button id="save-btn-${cls}" class="btn btn-ok btn-sm" onclick="saveBracketNow('${cls}')">💾 Save Changes</button>
       </div>
       ${cfg.slots&&cfg.slots.length?`<div style="margin-top:12px">
         <div style="font-size:11px;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:700">Seeds (click to edit name)</div>
@@ -2715,16 +2747,37 @@ function toggleBracketVisible(cls,val){
   showToast(`Class ${cls} bracket ${val?'is now PUBLIC ✓':'set to Private'}`,(val?'':'tw'));
 }
 
+let _bracketSaveTimer=null;
+function _debouncedBracketSave(cls){
+  clearTimeout(_bracketSaveTimer);
+  // Show unsaved indicator
+  const btn=document.getElementById(`save-btn-${cls}`);
+  if(btn){btn.textContent='💾 Save Changes';btn.style.background='var(--orange)';btn.style.borderColor='var(--orange)';}
+  _bracketSaveTimer=setTimeout(()=>{
+    saveState();
+    if(btn){btn.textContent='✓ Saved';btn.style.background='var(--green)';btn.style.borderColor='var(--green)';}
+    setTimeout(()=>{if(btn){btn.textContent='💾 Save Changes';btn.style.background='';btn.style.borderColor='';}},2000);
+  },1000);
+}
+function saveBracketNow(cls){
+  clearTimeout(_bracketSaveTimer);
+  saveState();
+  const btn=document.getElementById(`save-btn-${cls}`);
+  if(btn){btn.textContent='✓ Saved!';btn.style.background='var(--green)';btn.style.borderColor='var(--green)';}
+  setTimeout(()=>{if(btn){btn.textContent='💾 Save Changes';btn.style.background='';btn.style.borderColor='';}},2000);
+  showToast(`✓ Class ${cls} changes saved`);
+}
 function updateBracketSize(cls,val){
   const n=parseInt(val);if(isNaN(n)||n<2||n>20)return;
-  initBrackets();state.brackets[cls].size=n;saveState();
-  showToast(`Class ${cls} bracket: ${n} seeds`);
+  initBrackets();state.brackets[cls].size=n;
+  _debouncedBracketSave(cls);
 }
 
 function updateRoundDate(cls,ri,field,val){
   initBrackets();
   if(!state.brackets[cls].rounds) state.brackets[cls].rounds=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG[cls].rounds));
-  state.brackets[cls].rounds[ri][field]=val;saveState();
+  state.brackets[cls].rounds[ri][field]=val;
+  _debouncedBracketSave(cls);
 }
 
 function resetBracket(cls){
