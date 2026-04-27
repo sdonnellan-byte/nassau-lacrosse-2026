@@ -266,104 +266,6 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
 <div id="fb-banner"></div>
 
 <!-- TABS -->
-<div class="overlay hidden" id="setup-ov">
-  <div class="modal xl" style="max-width:620px;max-height:90vh;overflow-y:auto">
-    <button class="mcl" onclick="closeSetupGuide()">✕</button>
-    <h2>🚀 Go Live in 15 Minutes</h2>
-    <p style="font-size:13px;color:var(--gray);margin-bottom:18px">Follow these steps once and your site will be live at a real URL, updating in real time for anyone in the world.</p>
-
-    <div class="sg-step">
-      <div class="sg-num">1</div>
-      <div class="sg-body">
-        <h3>Create a Free Firebase Account</h3>
-        <p>Go to <a href="https://firebase.google.com" target="_blank">firebase.google.com</a> and click <strong>Get Started</strong>. Sign in with any Google account (Gmail works).</p>
-      </div>
-    </div>
-
-    <div class="sg-step">
-      <div class="sg-num">2</div>
-      <div class="sg-body">
-        <h3>Create a New Project</h3>
-        <p>Click <strong>"Add project"</strong> → name it <code>nassau-lacrosse</code> → disable Google Analytics → click <strong>Create project</strong>. Wait about 10 seconds for it to finish.</p>
-      </div>
-    </div>
-
-    <div class="sg-step">
-      <div class="sg-num">3</div>
-      <div class="sg-body">
-        <h3>Set Up the Realtime Database</h3>
-        <p>In the left sidebar click <strong>Build → Realtime Database → Create Database</strong>. Choose <strong>United States</strong> as the region. When asked about security rules, choose <strong>"Start in test mode"</strong> → click Enable.</p>
-      </div>
-    </div>
-
-    <div class="sg-step">
-      <div class="sg-num">4</div>
-      <div class="sg-body">
-        <h3>Get Your Config Keys</h3>
-        <p>Click the <strong>⚙️ gear icon</strong> next to "Project Overview" → <strong>Project settings</strong>. Scroll down to <strong>"Your apps"</strong> and click the <strong>&lt;/&gt; Web</strong> icon. Give the app a nickname like <code>nassau-lax</code> → click <strong>Register app</strong>.</p>
-        <p style="margin-top:6px">You'll see a block of code. Copy the 7 values inside <code>firebaseConfig</code> — you need all of them for the next step.</p>
-        <div class="sg-highlight">📋 The values look like: apiKey, authDomain, databaseURL, projectId, storageBucket, messagingSenderId, appId</div>
-      </div>
-    </div>
-
-    <div class="sg-step">
-      <div class="sg-num">5</div>
-      <div class="sg-body">
-        <h3>Paste Your Keys Into the HTML File</h3>
-        <p>Open <code>nassau_lacrosse_2026.html</code> in Notepad (Windows) or TextEdit (Mac). Find this section near the bottom of the file:</p>
-        <div style="background:var(--navy);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-top:6px;font-family:monospace;font-size:11px;color:var(--text-dim);line-height:1.7">
-          apiKey: <span style="color:var(--orange)">"PASTE_YOUR_API_KEY_HERE"</span>,<br>
-          authDomain: <span style="color:var(--orange)">"PASTE_YOUR_AUTH_DOMAIN_HERE"</span>,<br>
-          databaseURL: <span style="color:var(--orange)">"PASTE_YOUR_DATABASE_URL_HERE"</span>,<br>
-          <span style="color:var(--gray)">... and so on for all 7 values</span>
-        </div>
-        <p style="margin-top:8px">Replace each <code>PASTE_YOUR_..._HERE</code> with the real value from Firebase. Keep the quotes around each value. Save the file when done.</p>
-      </div>
-    </div>
-
-    <div class="sg-step">
-      <div class="sg-num">6</div>
-      <div class="sg-body">
-        <h3>Set Firebase Security Rules</h3>
-        <p>In Firebase Console, go to <strong>Realtime Database → Rules</strong> tab. Replace everything there with this and click <strong>Publish</strong>:</p>
-        <div style="background:var(--navy);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-top:6px;font-family:monospace;font-size:12px;color:var(--green)">
-          {<br>&nbsp;&nbsp;"rules": {<br>&nbsp;&nbsp;&nbsp;&nbsp;"ncgl2026": {<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".read": true,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".write": true<br>&nbsp;&nbsp;&nbsp;&nbsp;}<br>&nbsp;&nbsp;}<br>}
-        </div>
-      </div>
-    </div>
-
-    <div class="sg-step">
-      <div class="sg-num">7</div>
-      <div class="sg-body">
-        <h3>Deploy to Netlify (Your Live URL)</h3>
-        <p><strong>a)</strong> Go to <a href="https://app.netlify.com/drop" target="_blank">app.netlify.com/drop</a> in your browser.<br>
-        <strong>b)</strong> Drag and drop your updated <code>nassau_lacrosse_2026.html</code> file onto the page.<br>
-        <strong>c)</strong> Netlify gives you a URL like <code>https://lively-fox-abc123.netlify.app</code> — that's your live site!<br>
-        <strong>d)</strong> To get a better URL: click <strong>Site configuration → Site details → Change site name</strong> and rename it to something like <code>nassau-lacrosse-2026</code>.<br>
-        Your final URL will be: <code style="color:var(--green)">https://nassau-lacrosse-2026.netlify.app</code></p>
-      </div>
-    </div>
-
-    <div class="sg-step">
-      <div class="sg-num">8</div>
-      <div class="sg-body">
-        <h3>You're Live! 🎉</h3>
-        <p>Share your Netlify URL with coaches, parents, and league officials. From now on:</p>
-        <ul style="font-size:13px;color:var(--text-dim);margin-top:6px;padding-left:16px;line-height:2">
-          <li>Admin enters scores → all visitors see the update within 1–2 seconds</li>
-          <li>Coaches submit scores for review → appears in admin queue instantly</li>
-          <li>Anyone can view standings, schedules, and team pages from any device</li>
-        </ul>
-        <div class="sg-highlight" style="margin-top:10px">💡 <strong>Updating the site later:</strong> If you get a new version of the HTML file from Claude, just paste your same Firebase config into the new file and drag it to Netlify again. Your data is safe in Firebase — nothing gets reset.</div>
-      </div>
-    </div>
-
-    <hr class="sg-divider">
-    <p style="font-size:12px;color:var(--gray);text-align:center">Both Firebase and Netlify are free for this use case. No credit card required.</p>
-    <button class="btn btn-p" style="margin-top:12px" onclick="closeSetupGuide()">Got it — let's go! 🚀</button>
-  </div>
-</div>
-
 <!-- EDIT MODAL -->
 <div class="overlay hidden" id="edit-ov">
   <div class="modal">
@@ -383,39 +285,6 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
 </div>
 
 <!-- SHARE MODAL -->
-<div class="overlay hidden" id="share-ov">
-  <div class="modal wide">
-    <button class="mcl" onclick="closeShare()">✕</button>
-    <h2>🔗 Share Standings</h2>
-    <div class="share-tabs">
-      <button class="stab active" onclick="switchShareTab('link',this)">📋 Share Link</button>
-      <button class="stab" onclick="switchShareTab('host',this)">🌐 Host Online</button>
-    </div>
-    <div class="ssec active" id="ss-link">
-      <p style="font-size:13px;color:var(--gray);margin-bottom:8px">Generate a snapshot link with all current scores baked in. Anyone who opens it sees the standings exactly as they are right now.</p>
-      <div class="wbox">⚠️ This link is a snapshot. Re-generate after each score update to share the latest.</div>
-      <button class="btn btn-p" style="width:auto;padding:8px 18px;margin-bottom:8px" onclick="generateShareLink()">⚡ Generate Share Link</button>
-      <div class="surl" id="share-url-row" style="display:none">
-        <input type="text" id="share-url-inp" readonly>
-        <button class="btn btn-s btn-sm" onclick="copyShareLink()">Copy</button>
-      </div>
-      <div id="share-copied" class="sbox" style="display:none;margin-top:7px">✓ Copied to clipboard!</div>
-      <div id="share-size" style="font-size:11px;color:var(--gray);margin-top:4px"></div>
-    </div>
-    <div class="ssec" id="ss-host">
-      <p style="font-size:13px;color:var(--gray);margin-bottom:10px">Host this file online so everyone gets a permanent, bookmarkable URL — free, no technical skills needed.</p>
-      <ol class="steps">
-        <li><div><strong>Download the HTML file</strong> from Claude to your computer.</div></li>
-        <li><div><strong>Go to <a href="https://app.netlify.com/drop" target="_blank" style="color:var(--blue-lt)">app.netlify.com/drop</a></strong> — free, no account needed.</div></li>
-        <li><div><strong>Drag &amp; drop</strong> your <code style="background:var(--navy);padding:1px 5px;border-radius:3px;font-size:11px">.html</code> file onto the page.</div></li>
-        <li><div><strong>Copy your live URL</strong> like <code style="background:var(--navy);padding:1px 5px;border-radius:3px;font-size:11px">nassau-lax.netlify.app</code> and share it!</div></li>
-        <li><div><strong>Re-deploy any time</strong> by dragging an updated file again.</div></li>
-      </ol>
-      <a href="https://app.netlify.com/drop" target="_blank" class="nlbtn">🚀 Open Netlify Drop →</a>
-    </div>
-  </div>
-</div>
-
 <!-- ARCHIVE VIEWER MODAL -->
 <div class="overlay hidden" id="arc-ov">
   <div class="modal xl">
@@ -477,8 +346,8 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
 <!-- SCHEDULE -->
 <div id="panel-schedule" class="panel">
   <div class="fbar" id="sched-fbar">
-    <button class="fbtn active" onclick="filterSched('all',this)">All</button>
-    <button class="fbtn" onclick="filterSched('pending',this)">Unplayed</button>
+    <button class="fbtn" onclick="filterSched('all',this)">All</button>
+    <button class="fbtn active" onclick="filterSched('pending',this)">Unplayed</button>
     <button class="fbtn" onclick="filterSched('played',this)">Played</button>
   </div>
   <div style="margin:8px 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -775,7 +644,7 @@ const DEFAULT_BRACKET_CONFIG={
     {name:'Finals',date:'Thursday May 28, 2026',venue:'@ Adelphi University'}],
     champion:'Class C Champions',slots:[],matchResults:{},playinMatch:null},
   D:{visible:false,size:4,rounds:[
-    {name:'Semifinals',date:'Monday May 18, 2026',venue:'@ HS'},
+    {name:'Semifinals',date:'Monday May 18, 2026',venue:'@ Adelphi University'},
     {name:'Finals',date:'Thursday May 28, 2026',venue:'@ Adelphi University'}],
     champion:'Class D Champions',slots:[],matchResults:{},playinMatch:null}
 };
@@ -940,7 +809,7 @@ function saveState(){
 }
 
 let state=loadState();
-let isAdmin=false,editGameId=null,schedFilter='all',schedTeamFilter='';
+let isAdmin=false,editGameId=null,schedFilter='pending',schedTeamFilter='';
 if(!state.pending)state.pending=[];
 if(!state.archives)state.archives=[];
 if(!state.playoffSpots)state.playoffSpots={...DEFAULT_PLAYOFF_SPOTS};
@@ -1950,14 +1819,12 @@ function initBrackets(){
     if(DEFAULT_BRACKET_CONFIG[cls].byeSeeds&&!state.brackets[cls].byeSeeds){
       state.brackets[cls].byeSeeds=DEFAULT_BRACKET_CONFIG[cls].byeSeeds;
     }
-    // Fix stale venues: if a round still has '@ HS' or '@ TBD' but DEFAULT now says '@ Adelphi University',
-    // auto-correct it so saved Firebase data gets updated on next save
+    // Fix stale venues: auto-correct any round still @ HS or @ TBD where default is now @ Adelphi University
     const defRounds=DEFAULT_BRACKET_CONFIG[cls].rounds;
     (state.brackets[cls].rounds||[]).forEach((r,ri)=>{
       if(defRounds[ri]&&(r.venue==='@ HS'||r.venue==='@ TBD')&&defRounds[ri].venue==='@ Adelphi University'){
         r.venue='@ Adelphi University';
       }
-      // Also fix stale dates that may say 'Tuesday May 19' vs correct 'Tuesday May 19, 2026'
       if(defRounds[ri]&&!r.date) r.date=defRounds[ri].date;
     });
   });
@@ -2619,6 +2486,47 @@ function renderPlayoffsTab(highlightCls){
     </div>`;
   }
 
+  // ── PLAYOFF RESULTS SUMMARY ─────────────────────────────────────────────
+  // Show completed playoff results below all brackets
+  const summaryRows=[];
+  ['A','B','C','D'].forEach(cls=>{
+    const cfg=state.brackets[cls];
+    if(!cfg||!cfg.matchResults) return;
+    const rounds=cfg.rounds||DEFAULT_BRACKET_CONFIG[cls].rounds;
+    const hasByeSeeds=cfg.byeSeeds||(DEFAULT_BRACKET_CONFIG[cls]&&DEFAULT_BRACKET_CONFIG[cls].byeSeeds)||0;
+    Object.entries(cfg.matchResults).forEach(([key,st])=>{
+      if(!st||st.topScore==null||st.botScore==null) return;
+      // Parse round index from key e.g. r1m0
+      const m=key.match(/^r(\d+)m(\d+)$/);
+      if(!m) return;
+      const ri=parseInt(m[1]);
+      // For byeSeeds brackets the round indices are offset by 1 from rounds array
+      const roundInfo=rounds[hasByeSeeds>0?ri:ri]||{name:`Round ${ri+1}`};
+      const winner=st.winner==='top'?st.top:st.winner==='bot'?st.bot:'';
+      summaryRows.push({cls,round:roundInfo.name,top:st.top,bot:st.bot,topScore:st.topScore,botScore:st.botScore,winner});
+    });
+  });
+  if(summaryRows.length){
+    const clsColors2={A:'var(--cA)',B:'var(--cB)',C:'var(--cC)',D:'var(--cD)'};
+    html+=`<div style="margin-top:32px;border-top:2px solid var(--border);padding-top:24px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:18px;text-transform:uppercase;letter-spacing:2px;color:var(--gold);margin-bottom:16px">📋 Playoff Results</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${summaryRows.map(r=>{
+          const col=clsColors2[r.cls];
+          const topW=r.winner===r.top;
+          const botW=r.winner===r.bot;
+          return`<div style="display:flex;align-items:center;gap:10px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;flex-wrap:wrap">
+            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:${col};min-width:70px">Class ${r.cls}</span>
+            <span style="font-size:11px;color:var(--gray);min-width:90px">${r.round}</span>
+            <span style="font-size:13px;font-weight:${topW?'900':'400'};color:${topW?'var(--text)':'var(--gray)'};flex:1">${r.top}</span>
+            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:15px;color:var(--gold);min-width:50px;text-align:center">${r.topScore} – ${r.botScore}</span>
+            <span style="font-size:13px;font-weight:${botW?'900':'400'};color:${botW?'var(--text)':'var(--gray)'};flex:1;text-align:right">${r.bot}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
   el.innerHTML=html;
 }
 
@@ -2959,26 +2867,6 @@ function exportCSV(type){
 }
 
 // ── SHARE ─────────────────────────────────────────────────────────────────
-function openShare(){document.getElementById('share-url-row').style.display='none';document.getElementById('share-copied').style.display='none';document.getElementById('share-size').textContent='';document.getElementById('share-ov').classList.remove('hidden');}
-function closeShare(){document.getElementById('share-ov').classList.add('hidden');}
-document.getElementById('share-ov').addEventListener('click',e=>{if(e.target===document.getElementById('share-ov'))closeShare();});
-function switchShareTab(n,el){document.querySelectorAll('.stab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.ssec').forEach(s=>s.classList.remove('active'));el.classList.add('active');document.getElementById('ss-'+n).classList.add('active');}
-function generateShareLink(){
-  try{
-    const played=state.games.filter(g=>g.played).map(g=>({id:g.id,home:g.home,away:g.away,conf:g.conf,homeScore:g.homeScore,awayScore:g.awayScore,played:true}));
-    const payload=JSON.stringify({teams:TEAMS.filter(t=>!t._ph),games:played,year:state.year,archives:[]});
-    const encoded=btoa(encodeURIComponent(payload));
-    const url=`${location.href.split('#')[0]}#data=${encoded}`;
-    document.getElementById('share-url-inp').value=url;
-    document.getElementById('share-url-row').style.display='flex';
-    document.getElementById('share-size').textContent=`${played.length} result${played.length!==1?'s':''} encoded · ~${Math.round(encoded.length/1024*10)/10} KB`;
-  }catch(e){showToast('Error generating link','te');}
-}
-function copyShareLink(){
-  const inp=document.getElementById('share-url-inp');
-  try{navigator.clipboard.writeText(inp.value).then(()=>{document.getElementById('share-copied').style.display='block';showToast('✓ Copied!');});}
-  catch(e){inp.select();document.execCommand('copy');document.getElementById('share-copied').style.display='block';showToast('✓ Copied!');}
-}
 
 // ── ADMIN SUB-TABS ────────────────────────────────────────────────────────
 function switchAdminSub(name,el){
@@ -3144,15 +3032,6 @@ function setFBBanner(status){
 }
 
 // ── SETUP GUIDE MODAL ─────────────────────────────────────────────────────
-function openSetupGuide(){
-  document.getElementById('setup-ov').classList.remove('hidden');
-}
-function closeSetupGuide(){
-  document.getElementById('setup-ov').classList.add('hidden');
-}
-document.getElementById('setup-ov').addEventListener('click',e=>{
-  if(e.target===document.getElementById('setup-ov'))closeSetupGuide();
-});
 
 // ── INIT WITH FIREBASE ────────────────────────────────────────────────────
 updateTitle();initSelects();renderAll();
@@ -3232,5 +3111,9 @@ if(isFirebaseConfigured){
   setFBBanner('local');
 }
 </script>
+<!-- BACK TO TOP -->
+<button id="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top"
+  style="display:none;position:fixed;bottom:22px;right:22px;z-index:999;background:var(--gold);color:var(--navy);border:none;border-radius:50%;width:42px;height:42px;font-size:18px;font-weight:900;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.4)">↑</button>
+<script>window.addEventListener('scroll',()=>{const b=document.getElementById('back-to-top');if(b)b.style.display=window.scrollY>300?'block':'none';});</script>
 </body>
 </html>
