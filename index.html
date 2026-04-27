@@ -760,8 +760,8 @@ const DEFAULT_PLAYOFF_SPOTS={A:8,B:10,C:8,D:4};
 const DEFAULT_BRACKET_CONFIG={
   A:{visible:false,size:8,rounds:[
     {name:'Quarter Finals',date:'Thursday May 14, 2026',venue:'@ HS'},
-    {name:'Semifinals',date:'Tuesday May 19, 2026',venue:'@ HS'},
-    {name:'Finals',date:'Wednesday May 27, 2026',venue:'@ TBD'}],
+    {name:'Semifinals',date:'Tuesday May 19, 2026',venue:'@ Adelphi University'},
+    {name:'Finals',date:'Wednesday May 27, 2026',venue:'@ Adelphi University'}],
     champion:'Class A Champions',slots:[],matchResults:{},playinMatch:null},
   B:{visible:false,size:10,byeSeeds:6,rounds:[
     {name:'First Round',date:'Wednesday May 13, 2026',venue:'@ HS'},
@@ -771,12 +771,12 @@ const DEFAULT_BRACKET_CONFIG={
     champion:'Class B Champions',slots:[],matchResults:{},playinMatch:null},
   C:{visible:false,size:8,rounds:[
     {name:'Quarter Finals',date:'Friday May 15, 2026',venue:'@ HS'},
-    {name:'Semifinals',date:'Thursday May 22, 2026',venue:'@ HS'},
-    {name:'Finals',date:'Thursday May 28, 2026',venue:'@ TBD'}],
+    {name:'Semifinals',date:'Thursday May 22, 2026',venue:'@ Adelphi University'},
+    {name:'Finals',date:'Thursday May 28, 2026',venue:'@ Adelphi University'}],
     champion:'Class C Champions',slots:[],matchResults:{},playinMatch:null},
   D:{visible:false,size:4,rounds:[
     {name:'Semifinals',date:'Monday May 18, 2026',venue:'@ HS'},
-    {name:'Finals',date:'Thursday May 28, 2026',venue:'@ TBD'}],
+    {name:'Finals',date:'Thursday May 28, 2026',venue:'@ Adelphi University'}],
     champion:'Class D Champions',slots:[],matchResults:{},playinMatch:null}
 };
 
@@ -1947,10 +1947,19 @@ function initBrackets(){
     if(!state.brackets[cls].matchResults) state.brackets[cls].matchResults={};
     if(state.brackets[cls].playinMatch===undefined) state.brackets[cls].playinMatch=null;
     if(!state.brackets[cls].slots) state.brackets[cls].slots=[];
-    // Always sync byeSeeds from DEFAULT config — this fixes Class B (6 bye seeds) after state was saved without it
     if(DEFAULT_BRACKET_CONFIG[cls].byeSeeds&&!state.brackets[cls].byeSeeds){
       state.brackets[cls].byeSeeds=DEFAULT_BRACKET_CONFIG[cls].byeSeeds;
     }
+    // Fix stale venues: if a round still has '@ HS' or '@ TBD' but DEFAULT now says '@ Adelphi University',
+    // auto-correct it so saved Firebase data gets updated on next save
+    const defRounds=DEFAULT_BRACKET_CONFIG[cls].rounds;
+    (state.brackets[cls].rounds||[]).forEach((r,ri)=>{
+      if(defRounds[ri]&&(r.venue==='@ HS'||r.venue==='@ TBD')&&defRounds[ri].venue==='@ Adelphi University'){
+        r.venue='@ Adelphi University';
+      }
+      // Also fix stale dates that may say 'Tuesday May 19' vs correct 'Tuesday May 19, 2026'
+      if(defRounds[ri]&&!r.date) r.date=defRounds[ri].date;
+    });
   });
 }
 
@@ -2717,15 +2726,13 @@ function renderBracketAdminControls(){
       </div>
       <div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px">Round Dates &amp; Venues</div>
       <div class="brc-dates">
-        ${rounds.map((r,ri)=>`<div class="brc-date-row">
-          <label>${r.name}</label>
-          <input type="text" id="rd-${cls}-${ri}-date" value="${(r.date||'').replace(/"/g,'&quot;')}" placeholder="e.g. Thursday May 14, 2026" oninput="stageBracketChange('${cls}')">
-          <input type="text" id="rd-${cls}-${ri}-venue" value="${(r.venue||'').replace(/"/g,'&quot;')}" placeholder="e.g. @ HS" style="margin-top:3px" oninput="stageBracketChange('${cls}')">
+        ${rounds.map((r,ri)=>`<div class="brc-date-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+          <div style="min-width:110px;font-size:12px;font-weight:700;color:var(--text)">${r.name}</div>
+          <div style="font-size:12px;color:var(--gray);flex:1">${r.date||'No date set'} &nbsp;·&nbsp; <span style="color:var(--blue-lt)">${r.venue||'No venue set'}</span></div>
+          <button class="btn btn-ol btn-sm" onclick="editRoundInfo('${cls}',${ri})" style="flex-shrink:0">✏️ Edit</button>
         </div>`).join('')}
       </div>
-      <div class="brc-actions">
-        <button id="save-btn-${cls}" class="btn btn-ok btn-sm" onclick="saveBracketNow('${cls}')">💾 Save Changes</button>
-      </div>
+      <div class="brc-actions"></div>
       ${cfg.slots&&cfg.slots.length?`<div style="margin-top:12px">
         <div style="font-size:11px;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:700">Seeds (click to edit name)</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:5px">
@@ -2755,80 +2762,30 @@ function toggleBracketVisible(cls,val){
   showToast(`Class ${cls} bracket ${val?'is now PUBLIC ✓':'set to Private'}`,(val?'':'tw'));
 }
 
-// Track which bracket classes have unsaved changes
-const _bracketDirty={A:false,B:false,C:false,D:false};
-let _bracketSaveTimer=null;
-let _suppressBracketRerender=false;
-let _suppressConfRerender=false;
+// Bracket save — handled via editRoundInfo() prompt modal
 
-function stageBracketChange(cls){
-  _bracketDirty[cls]=true;
-  const btn=document.getElementById(`save-btn-${cls}`);
-  if(btn){
-    btn.textContent='💾 Save Changes';
-    btn.style.background='var(--orange)';
-    btn.style.borderColor='var(--orange)';
-    btn.style.opacity='1';
-    btn.disabled=false;
-  }
+function updateBracketSize(cls,val){
+  const n=parseInt(val);if(isNaN(n)||n<2||n>20)return;
+  initBrackets();state.brackets[cls].size=n;
+  saveState();showToast(`Class ${cls} bracket: ${n} seeds`);
 }
 
-function saveBracketNow(cls){
-  // Read all current input values from DOM directly before saving
+function editRoundInfo(cls,ri){
+  if(!isAdmin)return;
   initBrackets();
   const cfg=state.brackets[cls];
-  const rounds=cfg.rounds||DEFAULT_BRACKET_CONFIG[cls].rounds;
-  rounds.forEach((r,ri)=>{
-    const dateEl=document.getElementById(`rd-${cls}-${ri}-date`);
-    const venueEl=document.getElementById(`rd-${cls}-${ri}-venue`);
-    if(dateEl) cfg.rounds[ri].date=dateEl.value;
-    if(venueEl) cfg.rounds[ri].venue=venueEl.value;
-  });
-  const sizeEl=document.querySelector(`[oninput="updateBracketSize('${cls}',this.value)"]`)||document.querySelector(`[onchange*="updateBracketSize('${cls}'"]`);
-  // also grab bracket size if changed
-  const sizeInput=document.querySelector(`input[onchange="updateBracketSize('${cls}',this.value)"]`);
-  if(sizeInput){const n=parseInt(sizeInput.value);if(!isNaN(n)&&n>=2&&n<=20)cfg.size=n;}
-
-  _bracketDirty[cls]=false;
-  _suppressBracketRerender=true;
+  if(!cfg.rounds) cfg.rounds=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG[cls].rounds));
+  const r=cfg.rounds[ri];
+  const newDate=prompt(`${r.name} — Date:`,r.date||'');
+  if(newDate===null)return;
+  const newVenue=prompt(`${r.name} — Venue:`,r.venue||'');
+  if(newVenue===null)return;
+  cfg.rounds[ri].date=newDate.trim();
+  cfg.rounds[ri].venue=newVenue.trim();
   saveState();
-  _suppressBracketRerender=false;
-
-  const btn=document.getElementById(`save-btn-${cls}`);
-  if(btn){
-    btn.textContent='✓ Saved!';
-    btn.style.background='var(--green)';
-    btn.style.borderColor='var(--green)';
-    setTimeout(()=>{
-      if(btn){btn.textContent='💾 Save Changes';btn.style.background='';btn.style.borderColor='';}
-    },2500);
-  }
-  showToast(`✓ Class ${cls} bracket saved`);
-}
-
-function updateBracketSize(cls,val){
-  const n=parseInt(val);if(isNaN(n)||n<2||n>20)return;
-  initBrackets();state.brackets[cls].size=n;
-  stageBracketChange(cls);
-}
-
-function updateRoundDate(cls,ri,field,val){
-  initBrackets();
-  if(!state.brackets[cls].rounds) state.brackets[cls].rounds=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG[cls].rounds));
-  state.brackets[cls].rounds[ri][field]=val;
-  stageBracketChange(cls);
-}
-function updateBracketSize(cls,val){
-  const n=parseInt(val);if(isNaN(n)||n<2||n>20)return;
-  initBrackets();state.brackets[cls].size=n;
-  _debouncedBracketSave(cls);
-}
-
-function updateRoundDate(cls,ri,field,val){
-  initBrackets();
-  if(!state.brackets[cls].rounds) state.brackets[cls].rounds=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG[cls].rounds));
-  state.brackets[cls].rounds[ri][field]=val;
-  _debouncedBracketSave(cls);
+  renderBracketAdminControls();
+  renderPlayoffsTab();
+  showToast(`✓ ${r.name} updated`);
 }
 
 function resetBracket(cls){
@@ -2901,8 +2858,7 @@ function renderAll(){
   updatePendingBubble();
   if(isAdmin){
     renderAdminPanel();
-    // Skip bracket admin re-render if we're mid-save to prevent wiping inputs
-    if(!_suppressBracketRerender&&document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')){
+    if(document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')){
       renderBracketAdminControls();
     }
   }
