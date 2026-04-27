@@ -195,6 +195,7 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
 .bracket-slot{display:flex;align-items:center;gap:7px;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;margin:2px 6px;font-size:12px;min-height:36px;cursor:default;transition:border-color .15s;position:relative}
 .bracket-slot.winner{border-color:var(--gold);background:rgba(245,158,11,.08)}
 .bracket-slot.editable{cursor:pointer}
+.bracket-slot.editable:hover{background:rgba(245,158,11,.12);border-color:var(--gold)}
 .bracket-slot.editable:hover{border-color:var(--blue-lt)}
 .bracket-seed{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:13px;color:var(--gold);min-width:18px;text-align:center;flex-shrink:0}
 .bracket-team{flex:1;font-weight:600;font-size:12px;color:var(--text)}
@@ -2055,7 +2056,8 @@ function renderBracket(cls){
       const teamDisplay=isTBA
         ?`<span class="bracket-team" style="color:var(--gold);font-style:italic;font-size:11px">${sl.team}</span>`
         :`<span class="bracket-team">${sl.team||'TBD'}</span>`;
-      return`<div class="bracket-slot ${wc} ${ec}" ${oc}><span class="bracket-seed">${sl.seed||''}</span>${teamDisplay}${sc}</div>`;
+      const editHint=isAdmin&&!isTBA?`<span style="font-size:9px;color:var(--gray);opacity:.6;flex-shrink:0">✏</span>`:'';
+      return`<div class="bracket-slot ${wc} ${ec}" ${oc}><span class="bracket-seed">${sl.seed||''}</span>${teamDisplay}${sc}${editHint}</div>`;
     };
     const mkFRSlot=(sl,clickKey,ri,mi)=>{
       const wc=sl.winner?'winner':'';
@@ -2232,9 +2234,10 @@ function renderBracket(cls){
         const teamDisplay=isPlayin
           ?`<span class="bracket-team" style="color:var(--gold);font-style:italic;font-size:11px">TBA — Play-In Winner</span>`
           :`<span class="bracket-team">${sl.team||'TBD'}</span>`;
+        const editHint=isAdmin&&!isPlayin?`<span style="font-size:9px;color:var(--gray);opacity:.6;flex-shrink:0">✏</span>`:'';
         html+=`<div class="bracket-slot ${wc} ${ec}" ${oc}>
           <span class="bracket-seed">${sl.seed||''}</span>
-          ${teamDisplay}${sc}
+          ${teamDisplay}${sc}${editHint}
         </div>`;
       });
       html+=`</div>`;
@@ -2712,28 +2715,187 @@ function editSeedSlot(cls,idx){
   saveState();renderBracketAdminControls();renderPlayoffsTab();
 }
 
+// Cascade-clear all downstream match results that depended on the winner from (cls, ri, mi)
+function clearMatchCascade(cls, ri, mi){
+  const cfg=state.brackets[cls];
+  if(!cfg||!cfg.matchResults) return;
+  // Walk forward through rounds and clear any result that was fed by this match
+  let curRi=ri+1;
+  let curMi=Math.floor(mi/2);
+  const slot=mi%2===0?'top':'bot';
+  while(true){
+    const nk=`r${curRi}m${curMi}`;
+    const nst=cfg.matchResults[nk];
+    if(!nst) break;
+    // If next round game has not been played, just clear the name slot
+    if(!nst.topScore&&!nst.botScore){
+      delete nst[slot];
+      // If both slots now empty, delete the whole key
+      if(!nst.top&&!nst.bot) delete cfg.matchResults[nk];
+      break; // stop cascade — no further results to clear
+    } else {
+      // Next round game WAS played — find which team came from this match and cascade further
+      const prevWinner=nst[slot]; // the team that came from our match
+      const nextSlot=slot; // same position propagates
+      // Clear this match's result entirely (the team that advanced is now invalid)
+      delete cfg.matchResults[nk];
+      // Continue cascade into the next round
+      curMi=Math.floor(curMi/2);
+      curRi++;
+    }
+  }
+}
+
 function openMatchEdit(cls,key,ri,mi){
   if(!isAdmin)return;initBrackets();
-  if(!state.brackets[cls].matchResults) state.brackets[cls].matchResults={};
-  const st=state.brackets[cls].matchResults[key]||{};
-  const slots=state.brackets[cls].slots||[];
-  const size=slots.length;
-  let topName=st.top||(ri===0?(slots[mi]||{}).team||'TBD':'TBD');
-  let botName=st.bot||(ri===0?(slots[size-1-mi]||{}).team||'TBD':'TBD');
-  const ts=prompt(`${topName} score (blank = not played):`,st.topScore??'');if(ts===null)return;
-  const bs=prompt(`${botName} score:`,st.botScore??'');if(bs===null)return;
+  const cfg=state.brackets[cls];
+  if(!cfg.matchResults) cfg.matchResults={};
+  const st=cfg.matchResults[key]||{};
+  const slots=cfg.slots||[];
+  const byeSeeds=cfg.byeSeeds||(DEFAULT_BRACKET_CONFIG[cls]&&DEFAULT_BRACKET_CONFIG[cls].byeSeeds)||0;
+
+  // Resolve team names: prefer stored names (from previous advance), fall back to seeding
+  let topName=st.top||'TBD';
+  let botName=st.bot||'TBD';
+
+  // If no stored names yet, derive from context
+  if(!st.top||!st.bot){
+    if(byeSeeds>0){
+      // Class B custom layout
+      const ft=slots.slice(byeSeeds); // [seed7,seed8,seed9,seed10]
+      if(ri===0){
+        // First round: r0m0=8v9, r0m1=7v10
+        const pairs=[
+          [ft[1]?.team||'TBD', ft[2]?.team||'TBD'], // 8v9
+          [ft[0]?.team||'TBD', ft[3]?.team||'TBD'], // 7v10
+        ];
+        if(!st.top) topName=pairs[mi]?.[0]||'TBD';
+        if(!st.bot) botName=pairs[mi]?.[1]||'TBD';
+      } else if(ri===1){
+        // QF: [#1 vs FR0-winner, #4 vs #5, #3 vs #6, #2 vs FR1-winner]
+        const qfTops=[slots[0]?.team,slots[3]?.team,slots[2]?.team,slots[1]?.team];
+        const qfBots=['fr0','TBD','TBD','fr1'];
+        if(!st.top) topName=qfTops[mi]||'TBD';
+        if(!st.bot){
+          if(mi===0){const fr=cfg.matchResults['r0m0']||{};botName=fr.winner==='top'?fr.top:fr.winner==='bot'?fr.bot:'FR Winner';}
+          else if(mi===3){const fr=cfg.matchResults['r0m1']||{};botName=fr.winner==='top'?fr.top:fr.winner==='bot'?fr.bot:'FR Winner';}
+          else botName=[slots[4]?.team,null,slots[5]?.team,null][mi]||'TBD';
+        }
+      } else {
+        // SF / Finals: use previous round winners
+        const prevKey=`r${ri-1}m${mi*2}`;
+        const prevKey2=`r${ri-1}m${mi*2+1}`;
+        const p1=cfg.matchResults[prevKey]||{};
+        const p2=cfg.matchResults[prevKey2]||{};
+        if(!st.top) topName=p1.winner==='top'?p1.top:p1.winner==='bot'?p1.bot:'TBD';
+        if(!st.bot) botName=p2.winner==='top'?p2.top:p2.winner==='bot'?p2.bot:'TBD';
+      }
+    } else {
+      // Standard bracket
+      if(ri===0){
+        // First round — read from slots using correct ordering
+        const size=slots.length;
+        let order=[];
+        if(size===8) order=[[0,7],[3,4],[2,5],[1,6]];
+        else if(size===4) order=[[0,3],[1,2]];
+        else{ const h=Math.ceil(size/2); for(let i=0;i<h;i++) order.push([i,size-1-i]); }
+        const pair=order[mi]||[mi,size-1-mi];
+        if(!st.top) topName=slots[pair[0]]?.team||'TBD';
+        if(!st.bot) botName=slots[pair[1]]?.team||'TBD';
+      } else {
+        // Later rounds — use previous round stored results
+        const pk1=`r${ri-1}m${mi*2}`;
+        const pk2=`r${ri-1}m${mi*2+1}`;
+        const p1=cfg.matchResults[pk1]||{};
+        const p2=cfg.matchResults[pk2]||{};
+        if(!st.top) topName=p1.winner==='top'?p1.top:p1.winner==='bot'?p1.bot:'TBD';
+        if(!st.bot) botName=p2.winner==='top'?p2.top:p2.winner==='bot'?p2.bot:'TBD';
+      }
+    }
+  }
+
+  // If result already exists, offer option to clear it first
+  const hasResult=st.topScore!=null&&st.botScore!=null;
+  if(hasResult){
+    const action=prompt(
+      `${topName} ${st.topScore}–${st.botScore} ${botName}\n\nEnter new scores to update, or type CLEAR to remove this result and retract the bracket:`,
+      ''
+    );
+    if(action===null)return;
+    if(action.trim().toUpperCase()==='CLEAR'){
+      // Remove this result and cascade-clear downstream
+      delete cfg.matchResults[key];
+      clearMatchCascade(cls,ri,mi);
+      saveState();
+      renderPlayoffsTab();
+      if(isAdmin&&document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')) renderBracketAdminControls();
+      showToast(`✓ Result cleared — bracket retracted`,'tw');
+      return;
+    }
+    // Otherwise treat their input as the top score
+    const bs=prompt(`${botName} score:`,st.botScore??'');
+    if(bs===null)return;
+    const tsv=action.trim()===''?null:parseInt(action);
+    const bsv=bs.trim()===''?null:parseInt(bs);
+    if(tsv!=null&&isNaN(tsv)){showToast('Invalid score — enter a number','tw');return;}
+    if(bsv!=null&&isNaN(bsv)){showToast('Invalid score — enter a number','tw');return;}
+    const winner=(tsv!=null&&bsv!=null)?(tsv>bsv?'top':'bot'):null;
+    const oldWinner=st.winner==='top'?st.top:st.bot;
+    const newWinner=winner==='top'?topName:botName;
+    // If winner changed, cascade-clear downstream before re-advancing
+    if(winner&&oldWinner&&newWinner!==oldWinner){
+      clearMatchCascade(cls,ri,mi);
+    }
+    cfg.matchResults[key]={top:topName,bot:botName,topScore:tsv,botScore:bsv,winner};
+    if(winner){
+      const wName=newWinner;
+      const nk=`r${ri+1}m${Math.floor(mi/2)}`;
+      const slot=mi%2===0?'top':'bot';
+      if(!cfg.matchResults[nk]) cfg.matchResults[nk]={};
+      const nextSt=cfg.matchResults[nk];
+      if(!nextSt.topScore&&!nextSt.botScore) nextSt[slot]=wName;
+    }
+    saveState();
+    renderPlayoffsTab();
+    if(isAdmin&&document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')) renderBracketAdminControls();
+    showToast(`✓ ${topName} ${tsv??'—'}–${bsv??'—'} ${botName}`);
+    return;
+  }
+
+  // No existing result — enter fresh scores
+  const ts=prompt(`${topName} score (leave blank = not played yet):`,st.topScore??'');
+  if(ts===null)return;
+  const bs=prompt(`${botName} score:`,st.botScore??'');
+  if(bs===null)return;
   const tsv=ts.trim()===''?null:parseInt(ts);
   const bsv=bs.trim()===''?null:parseInt(bs);
+  if(tsv!=null&&isNaN(tsv)){showToast('Invalid score — enter a number','tw');return;}
+  if(bsv!=null&&isNaN(bsv)){showToast('Invalid score — enter a number','tw');return;}
   const winner=(tsv!=null&&bsv!=null)?(tsv>bsv?'top':'bot'):null;
-  state.brackets[cls].matchResults[key]={top:topName,bot:botName,topScore:tsv,botScore:bsv,winner};
+
+  // Store this match result with team names so later rounds can reference them
+  cfg.matchResults[key]={top:topName,bot:botName,topScore:tsv,botScore:bsv,winner};
+
   // Auto-advance winner to next round
   if(winner){
     const wName=winner==='top'?topName:botName;
-    const nk=`r${ri+1}m${Math.floor(mi/2)}`;
-    if(!state.brackets[cls].matchResults[nk]) state.brackets[cls].matchResults[nk]={};
-    state.brackets[cls].matchResults[nk][mi%2===0?'top':'bot']=wName;
+    const nextRi=ri+1;
+    const nextMi=Math.floor(mi/2);
+    const slot=mi%2===0?'top':'bot';
+    const nk=`r${nextRi}m${nextMi}`;
+    if(!cfg.matchResults[nk]) cfg.matchResults[nk]={};
+    // Only overwrite if game hasn't been played yet (don't erase entered scores)
+    const nextSt=cfg.matchResults[nk];
+    if(!nextSt.topScore&&!nextSt.botScore){
+      nextSt[slot]=wName;
+    }
   }
-  saveState();renderPlayoffsTab();if(isAdmin)renderBracketAdminControls();
+
+  saveState();
+  renderPlayoffsTab();
+  if(isAdmin&&document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')){
+    renderBracketAdminControls();
+  }
   showToast(`✓ ${topName} ${tsv??'—'}–${bsv??'—'} ${botName}`);
 }
 
