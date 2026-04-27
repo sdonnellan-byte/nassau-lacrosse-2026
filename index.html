@@ -1286,6 +1286,7 @@ function deleteResult(){
 
 // ── CONFERENCE MANAGER ────────────────────────────────────────────────────
 let _confSaveTimer=null;
+let _suppressConfRerender=false;
 function _debouncedConfSave(){
   clearTimeout(_confSaveTimer);
   const btn=document.getElementById('conf-save-btn');
@@ -1293,7 +1294,9 @@ function _debouncedConfSave(){
   if(btn){btn.textContent='💾 Save Now';btn.style.background='var(--orange)';btn.style.borderColor='var(--orange)';}
   if(status) status.style.display='none';
   _confSaveTimer=setTimeout(()=>{
+    _suppressConfRerender=true;
     saveState();
+    _suppressConfRerender=false;
     if(btn){btn.textContent='💾 Save Now';btn.style.background='';btn.style.borderColor='';}
     if(status){status.textContent='✓ All changes saved';status.style.display='inline';}
     setTimeout(()=>{if(status) status.style.display='none';},3000);
@@ -1301,7 +1304,9 @@ function _debouncedConfSave(){
 }
 function saveConfNow(){
   clearTimeout(_confSaveTimer);
+  _suppressConfRerender=true;
   saveState();
+  _suppressConfRerender=false;
   const btn=document.getElementById('conf-save-btn');
   const status=document.getElementById('conf-save-status');
   if(btn){btn.textContent='✓ Saved!';btn.style.background='var(--green)';btn.style.borderColor='var(--green)';}
@@ -2752,23 +2757,28 @@ function toggleBracketVisible(cls,val){
 }
 
 let _bracketSaveTimer=null;
+let _suppressBracketRerender=false; // prevents renderAll from wiping inputs mid-save
+
 function _debouncedBracketSave(cls){
   clearTimeout(_bracketSaveTimer);
-  // Show unsaved indicator
   const btn=document.getElementById(`save-btn-${cls}`);
   if(btn){btn.textContent='💾 Save Changes';btn.style.background='var(--orange)';btn.style.borderColor='var(--orange)';}
   _bracketSaveTimer=setTimeout(()=>{
+    _suppressBracketRerender=true;
     saveState();
+    _suppressBracketRerender=false;
     if(btn){btn.textContent='✓ Saved';btn.style.background='var(--green)';btn.style.borderColor='var(--green)';}
-    setTimeout(()=>{if(btn){btn.textContent='💾 Save Changes';btn.style.background='';btn.style.borderColor='';}},2000);
-  },1000);
+    setTimeout(()=>{if(btn){btn.textContent='💾 Save Changes';btn.style.background='';btn.style.borderColor='';}},2500);
+  },600);
 }
 function saveBracketNow(cls){
   clearTimeout(_bracketSaveTimer);
+  _suppressBracketRerender=true;
   saveState();
+  _suppressBracketRerender=false;
   const btn=document.getElementById(`save-btn-${cls}`);
   if(btn){btn.textContent='✓ Saved!';btn.style.background='var(--green)';btn.style.borderColor='var(--green)';}
-  setTimeout(()=>{if(btn){btn.textContent='💾 Save Changes';btn.style.background='';btn.style.borderColor='';}},2000);
+  setTimeout(()=>{if(btn){btn.textContent='💾 Save Changes';btn.style.background='';btn.style.borderColor='';}},2500);
   showToast(`✓ Class ${cls} changes saved`);
 }
 function updateBracketSize(cls,val){
@@ -2852,7 +2862,13 @@ function editPlayinInfo(){
 function renderAll(){
   renderConfStandings();renderClassStandings();renderSchedule();renderResults();
   updatePendingBubble();
-  if(isAdmin){renderAdminPanel();if(document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active'))renderBracketAdminControls();}
+  if(isAdmin){
+    renderAdminPanel();
+    // Skip bracket admin re-render if we're mid-save to prevent wiping inputs
+    if(!_suppressBracketRerender&&document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')){
+      renderBracketAdminControls();
+    }
+  }
   updateTitle();initSelects();
   initBrackets();
   renderPlayoffsTab();
