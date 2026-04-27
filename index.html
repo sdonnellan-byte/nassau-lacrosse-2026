@@ -876,7 +876,7 @@ function loadState(){
       TEAMS=[...JSON.parse(JSON.stringify(DEFAULT_TEAMS)),...customTeams];
       buildTM();
       const migratedGames=migrateGameIds(parsed.games||[]);
-      return{teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:parsed.pending||[],year:parsed.year||2026,archives:parsed.archives||[],playoffSpots:parsed.playoffSpots||{...DEFAULT_PLAYOFF_SPOTS}};
+      return{teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:parsed.pending||[],year:parsed.year||2026,archives:parsed.archives||[],playoffSpots:parsed.playoffSpots||{...DEFAULT_PLAYOFF_SPOTS},brackets:parsed.brackets||JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG)),messages:parsed.messages||[],playinDate:parsed.playinDate||'Tuesday, May 14, 2026',playinVenue:parsed.playinVenue||'@ Higher Seed'};
     }
   }catch(e){console.warn('v7 load:',e);}
 
@@ -913,6 +913,10 @@ function loadState(){
 
 function saveState(){
   state.teams=TEAMS;
+  // Ensure these fields are always on state before saving
+  if(!state.playinDate) state.playinDate='Tuesday, May 14, 2026';
+  if(!state.playinVenue) state.playinVenue='@ Higher Seed';
+  if(!state.brackets) state.brackets=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG));
   // 1. Save locally as fallback, clear old keys
   try{
     localStorage.setItem(SK,JSON.stringify(state));
@@ -2736,8 +2740,8 @@ function renderBracketAdminControls(){
     </div>`;
   });
   el.innerHTML=html;
-  // Save AFTER rendering so Firebase listener re-render doesn't race with innerHTML
-  setTimeout(()=>saveState(),0);
+  // Do NOT auto-save here — only save when admin explicitly changes a value
+  // (prevents stale localStorage data overwriting Firebase-stored custom rounds on page load)
 }
 
 function toggleBracketVisible(cls,val){
