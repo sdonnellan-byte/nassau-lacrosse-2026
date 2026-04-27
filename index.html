@@ -407,22 +407,53 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
 <div id="panel-submit" class="panel">
   <div class="scard" style="max-width:540px;margin:0 auto">
     <h2>📬 Submit a Score (Coach)</h2>
-    <p style="font-size:13px;color:var(--gray);margin-bottom:13px">Conference games only. Select your home team first — the away team list will automatically show only teams in the same conference.</p>
-    <div class="fg"><label>Your Email Address *</label><input type="email" id="sub-email" placeholder="coach@school.edu"></div>
-    <div class="fr">
-      <div class="fg"><label>Home Team</label><select id="sub-home" onchange="onSubHomeChange();checkSubGame()"></select></div>
-      <div class="vsl">VS</div>
-      <div class="fg"><label>Away Team (same conf)</label><select id="sub-away" onchange="checkSubGame()" disabled style="opacity:0.6"></select></div>
+
+    <!-- Mode toggle: only show playoffs option if a bracket is public -->
+    <div id="submit-mode-toggle" style="display:flex;gap:8px;margin-bottom:16px">
+      <button id="submit-mode-reg" class="btn btn-p btn-sm" onclick="setSubmitMode('regular')" style="flex:1">🏆 Regular Season</button>
+      <button id="submit-mode-po" class="btn btn-ol btn-sm" onclick="setSubmitMode('playoff')" style="flex:1;display:none">🥍 Playoffs</button>
     </div>
-    <div id="sub-conf-label" style="font-size:12px;font-weight:700;color:var(--blue-lt);margin:-2px 0 8px;letter-spacing:.5px"></div>
-    <div class="fr" style="margin-top:4px">
-      <div class="fg"><label id="sub-hl">Home Score</label><input type="number" id="sub-hs" min="0" value="0"></div>
-      <div class="vsl">–</div>
-      <div class="fg"><label id="sub-al">Away Score</label><input type="number" id="sub-as" min="0" value="0"></div>
+
+    <!-- REGULAR SEASON SECTION -->
+    <div id="submit-regular-section">
+      <p style="font-size:13px;color:var(--gray);margin-bottom:13px">Conference games only. Select your home team first — the away team list will automatically show only teams in the same conference.</p>
+      <div class="fg"><label>Your Email Address *</label><input type="email" id="sub-email" placeholder="coach@school.edu"></div>
+      <div class="fr">
+        <div class="fg"><label>Home Team</label><select id="sub-home" onchange="onSubHomeChange();checkSubGame()"></select></div>
+        <div class="vsl">VS</div>
+        <div class="fg"><label>Away Team (same conf)</label><select id="sub-away" onchange="checkSubGame()" disabled style="opacity:0.6"></select></div>
+      </div>
+      <div id="sub-conf-label" style="font-size:12px;font-weight:700;color:var(--blue-lt);margin:-2px 0 8px;letter-spacing:.5px"></div>
+      <div class="fr" style="margin-top:4px">
+        <div class="fg"><label id="sub-hl">Home Score</label><input type="number" id="sub-hs" min="0" value="0"></div>
+        <div class="vsl">–</div>
+        <div class="fg"><label id="sub-al">Away Score</label><input type="number" id="sub-as" min="0" value="0"></div>
+      </div>
+      <div class="fg" style="margin-top:7px"><label>Notes (optional)</label><textarea id="sub-notes" placeholder="Any info for the admin..."></textarea></div>
+      <div id="sub-err" class="em" style="display:none"></div>
+      <button class="btn btn-p" onclick="coachSubmit()">📤 Submit for Review</button>
     </div>
-    <div class="fg" style="margin-top:7px"><label>Notes (optional)</label><textarea id="sub-notes" placeholder="Any info for the admin..."></textarea></div>
-    <div id="sub-err" class="em" style="display:none"></div>
-    <button class="btn btn-p" onclick="coachSubmit()">📤 Submit for Review</button>
+
+    <!-- PLAYOFF SECTION -->
+    <div id="submit-playoff-section" style="display:none">
+      <p style="font-size:13px;color:var(--gray);margin-bottom:13px">Select your playoff matchup from the live bracket. Only unplayed games are shown.</p>
+      <div class="fg"><label>Your Email Address *</label><input type="email" id="sub-po-email" placeholder="coach@school.edu"></div>
+      <div class="fg">
+        <label>Playoff Matchup</label>
+        <select id="sub-po-matchup" onchange="onPoMatchupChange()">
+          <option value="">— Select matchup —</option>
+        </select>
+      </div>
+      <div id="sub-po-matchup-label" style="font-size:12px;color:var(--gray);margin:-4px 0 8px"></div>
+      <div class="fr" style="margin-top:4px">
+        <div class="fg"><label id="sub-po-hl">Home Score</label><input type="number" id="sub-po-hs" min="0" value="0"></div>
+        <div class="vsl">–</div>
+        <div class="fg"><label id="sub-po-al">Away Score</label><input type="number" id="sub-po-as" min="0" value="0"></div>
+      </div>
+      <div class="fg" style="margin-top:7px"><label>Notes (optional)</label><textarea id="sub-po-notes" placeholder="Any info for the admin..."></textarea></div>
+      <div id="sub-po-err" class="em" style="display:none"></div>
+      <button class="btn btn-p" onclick="coachSubmitPlayoff()">📤 Submit for Review</button>
+    </div>
   </div>
 </div>
 
@@ -1074,7 +1105,34 @@ function adminSubmitScore(){
 }
 
 function approvePending(i){
-  const s=state.pending[i];const g=findGame(s.homeId,s.awayId);
+  const s=state.pending[i];
+
+  // Handle playoff submissions differently
+  if(s.isPlayoff){
+    initBrackets();
+    const cfg=state.brackets[s.playoffCls];
+    if(!cfg){showToast('Bracket not found','te');return;}
+    if(!cfg.matchResults) cfg.matchResults={};
+    const existing=cfg.matchResults[s.playoffKey];
+    if(existing&&existing.topScore!=null){
+      if(!confirm(`⚠️ This playoff game already has a result: ${existing.top} ${existing.topScore}–${existing.botScore} ${existing.bot}.\n\nApproving will overwrite it. Continue?`))return;
+    }
+    const winner=s.homeScore>s.awayScore?'top':'bot';
+    cfg.matchResults[s.playoffKey]={top:s.homeName,bot:s.awayName,topScore:s.homeScore,botScore:s.awayScore,winner};
+    // Auto-advance winner
+    const wName=winner==='top'?s.homeName:s.awayName;
+    const nk=`r${s.playoffRi+1}m${Math.floor(s.playoffMi/2)}`;
+    const slot=s.playoffMi%2===0?'top':'bot';
+    if(!cfg.matchResults[nk]) cfg.matchResults[nk]={};
+    if(!cfg.matchResults[nk].topScore&&!cfg.matchResults[nk].botScore) cfg.matchResults[nk][slot]=wName;
+    state.pending.splice(i,1);
+    saveState();renderAll();
+    showToast(`✓ Playoff score approved — ${wName} advances`);
+    return;
+  }
+
+  // Regular season submission
+  const g=findGame(s.homeId,s.awayId);
   if(!g){showToast('Game not found in schedule','te');return;}
   if(g.played){
     if(!confirm(`⚠️ This game already has a result: ${TM[g.home]?.name||g.home} ${g.homeScore}–${g.awayScore} ${TM[g.away]?.name||g.away}.\n\nApproving will overwrite it. Continue?`))return;
@@ -1129,7 +1187,166 @@ function coachSubmit(){
   showToast('✓ Submitted for review!');
 }
 
-// ── EDIT MODAL ────────────────────────────────────────────────────────────
+// ── PLAYOFF SUBMIT MODE ───────────────────────────────────────────────────
+let _submitMode='regular';
+
+function setSubmitMode(mode){
+  _submitMode=mode;
+  const regBtn=document.getElementById('submit-mode-reg');
+  const poBtn=document.getElementById('submit-mode-po');
+  const regSec=document.getElementById('submit-regular-section');
+  const poSec=document.getElementById('submit-playoff-section');
+  if(mode==='playoff'){
+    regBtn.className='btn btn-ol btn-sm';regBtn.style.flex='1';
+    poBtn.className='btn btn-p btn-sm';poBtn.style.flex='1';
+    regSec.style.display='none';
+    poSec.style.display='block';
+    populatePoMatchups();
+  } else {
+    regBtn.className='btn btn-p btn-sm';regBtn.style.flex='1';
+    poBtn.className='btn btn-ol btn-sm';poBtn.style.flex='1';
+    regSec.style.display='block';
+    poSec.style.display='none';
+  }
+}
+
+function populatePoMatchups(){
+  // Build list of all unplayed live bracket matchups
+  const sel=document.getElementById('sub-po-matchup');
+  if(!sel)return;
+  initBrackets();
+  const matchups=[];
+  const clsColors={A:'Class A',B:'Class B',C:'Class C',D:'Class D'};
+
+  ['A','B','C','D'].forEach(cls=>{
+    const cfg=state.brackets[cls];
+    if(!cfg||!cfg.visible||!cfg.slots||!cfg.slots.length)return;
+    const rounds=cfg.rounds||DEFAULT_BRACKET_CONFIG[cls].rounds;
+    const byeSeeds=cfg.byeSeeds||(DEFAULT_BRACKET_CONFIG[cls]&&DEFAULT_BRACKET_CONFIG[cls].byeSeeds)||0;
+    const matchResults=cfg.matchResults||{};
+
+    // For each round, collect unplayed matches that have known teams
+    const addMatch=(key,ri,top,bot)=>{
+      if(!top||top==='TBD'||!bot||bot==='TBD') return;
+      if(top.startsWith('TBA')||bot.startsWith('TBA')) return;
+      const st=matchResults[key]||{};
+      if(st.topScore!=null&&st.botScore!=null)return; // already played
+      const round=rounds[ri]||{name:`Round ${ri+1}`,date:''};
+      matchups.push({cls,key,ri,mi:parseInt(key.replace(/r\d+m/,'')),top,bot,roundName:round.name,date:round.date||''});
+    };
+
+    if(byeSeeds>0){
+      // Class B: First Round
+      const ft=cfg.slots.slice(byeSeeds);
+      addMatch('r0m0',0,ft[1]?.team,ft[2]?.team); // 8v9
+      addMatch('r0m1',0,ft[0]?.team,ft[3]?.team); // 7v10
+      // QF
+      const fr0=matchResults['r0m0']||{};const fr1=matchResults['r0m1']||{};
+      const fr0w=fr0.winner==='top'?fr0.top:fr0.winner==='bot'?fr0.bot:null;
+      const fr1w=fr1.winner==='top'?fr1.top:fr1.winner==='bot'?fr1.bot:null;
+      addMatch('r1m0',1,cfg.slots[0]?.team,fr0w||null);
+      addMatch('r1m1',1,cfg.slots[3]?.team,cfg.slots[4]?.team);
+      addMatch('r1m2',1,cfg.slots[2]?.team,cfg.slots[5]?.team);
+      addMatch('r1m3',1,cfg.slots[1]?.team,fr1w||null);
+      // SF
+      [[2,0,1],[2,1,2],[2,2,3]].forEach(([ri2,mi2])=>{
+        const p1=matchResults[`r1m${mi2*2}`]||{};const p2=matchResults[`r1m${mi2*2+1}`]||{};
+        const t=p1.winner==='top'?p1.top:p1.winner==='bot'?p1.bot:null;
+        const b=p2.winner==='top'?p2.top:p2.winner==='bot'?p2.bot:null;
+        addMatch(`r2m${mi2}`,2,t,b);
+      });
+      // Finals
+      const sf0=matchResults['r2m0']||{};const sf1=matchResults['r2m1']||{};
+      addMatch('r3m0',3,sf0.winner==='top'?sf0.top:sf0.winner==='bot'?sf0.bot:null,sf1.winner==='top'?sf1.top:sf1.winner==='bot'?sf1.bot:null);
+    } else {
+      const size=cfg.slots.length;
+      const numRounds=size<=4?2:size<=8?3:4;
+      // First round
+      const order=size===8?[[0,7],[3,4],[2,5],[1,6]]:size===4?[[0,3],[1,2]]:[];
+      order.forEach(([hi,lo],mi)=>addMatch(`r0m${mi}`,0,cfg.slots[hi]?.team,cfg.slots[lo]?.team));
+      // Subsequent rounds
+      for(let r=1;r<numRounds;r++){
+        const prev=Math.ceil(order.length/Math.pow(2,r));
+        for(let m=0;m<Math.ceil(prev); m++){
+          const p1=matchResults[`r${r-1}m${m*2}`]||{};
+          const p2=matchResults[`r${r-1}m${m*2+1}`]||{};
+          const t=p1.winner==='top'?p1.top:p1.winner==='bot'?p1.bot:null;
+          const b=p2.winner==='top'?p2.top:p2.winner==='bot'?p2.bot:null;
+          addMatch(`r${r}m${m}`,r,t,b);
+        }
+      }
+    }
+  });
+
+  sel.innerHTML='<option value="">— Select matchup —</option>'+
+    matchups.map((m,i)=>`<option value="${i}">${m.roundName} — Class ${m.cls}: ${m.top} vs ${m.bot}</option>`).join('');
+  sel._matchups=matchups;
+  if(!matchups.length){
+    sel.innerHTML='<option value="">No unplayed matchups found</option>';
+  }
+}
+
+function onPoMatchupChange(){
+  const sel=document.getElementById('sub-po-matchup');
+  const lbl=document.getElementById('sub-po-matchup-label');
+  const hlbl=document.getElementById('sub-po-hl');
+  const albl=document.getElementById('sub-po-al');
+  const idx=parseInt(sel.value);
+  if(isNaN(idx)||!sel._matchups||!sel._matchups[idx]){lbl.textContent='';return;}
+  const m=sel._matchups[idx];
+  hlbl.textContent=m.top;
+  albl.textContent=m.bot;
+  lbl.textContent=`${m.roundName}${m.date?' · '+m.date:''}`;
+}
+
+function coachSubmitPlayoff(){
+  const email=document.getElementById('sub-po-email').value.trim();
+  const sel=document.getElementById('sub-po-matchup');
+  const hs=clampScore(document.getElementById('sub-po-hs').value);
+  const as=clampScore(document.getElementById('sub-po-as').value);
+  const notes=document.getElementById('sub-po-notes').value.trim();
+  const ew=document.getElementById('sub-po-err');ew.style.display='none';
+  if(!email||!email.includes('@')){ew.textContent='Enter a valid email.';ew.style.display='block';return;}
+  const idx=parseInt(sel.value);
+  if(isNaN(idx)||!sel._matchups||!sel._matchups[idx]){ew.textContent='Select a matchup.';ew.style.display='block';return;}
+  const m=sel._matchups[idx];
+  // Check not already pending
+  const alreadyPending=(state.pending||[]).find(p=>
+    p.playoffKey===m.key&&p.playoffCls===m.cls
+  );
+  if(alreadyPending){
+    ew.innerHTML=`⏳ <strong>This matchup has already been submitted and is awaiting admin approval.</strong>`;
+    ew.style.display='block';return;
+  }
+  state.pending.push({
+    homeId:null,awayId:null,
+    homeName:m.top,awayName:m.bot,
+    homeScore:hs,awayScore:as,
+    email:sanitize(email),notes:sanitize(notes),
+    ts:Date.now(),
+    playoffCls:m.cls,playoffKey:m.key,playoffRi:m.ri,playoffMi:m.mi,
+    isPlayoff:true
+  });
+  saveState();updatePendingBubble();
+  document.getElementById('sub-po-email').value='';
+  document.getElementById('sub-po-hs').value=0;
+  document.getElementById('sub-po-as').value=0;
+  document.getElementById('sub-po-notes').value='';
+  sel.value='';
+  document.getElementById('sub-po-matchup-label').textContent='';
+  showToast('✓ Playoff score submitted for review!');
+}
+
+function updateSubmitModeVisibility(){
+  // Show playoffs button only when at least one bracket is public
+  const anyPublic=['A','B','C','D'].some(cls=>state.brackets&&state.brackets[cls]&&state.brackets[cls].visible);
+  const poBtn=document.getElementById('submit-mode-po');
+  if(poBtn) poBtn.style.display=anyPublic?'':'none';
+  // If playoffs no longer live and we're in playoff mode, switch back
+  if(!anyPublic&&_submitMode==='playoff') setSubmitMode('regular');
+}
+
+// ── REGULAR SEASON SUBMIT ─────────────────────────────────────────────────
 function openEdit(gid){
   if(!isAdmin)return;editGameId=gid;
   const g=state.games.find(x=>x.id===gid);if(!g)return;
@@ -1739,6 +1956,19 @@ function renderAdminPanel(){
   const pl=document.getElementById('pending-list');
   if(!cnt){pl.innerHTML='<p class="no-res">No pending submissions.</p>';}
   else{pl.innerHTML=state.pending.map((s,i)=>{
+    if(s.isPlayoff){
+      // Playoff submission display
+      return`<div class="pcard" style="border-left:3px solid var(--gold)">
+        <div class="pt">🥍 <strong style="color:var(--gold)">PLAYOFF</strong> — Class ${s.playoffCls}: ${sanitize(s.homeName||'')} vs ${sanitize(s.awayName||'')}</div>
+        <div class="ps">${sanitize(s.homeName||'')} ${s.homeScore} – ${s.awayScore} ${sanitize(s.awayName||'')}</div>
+        <div class="pe">📧 ${sanitize(s.email)} · 🕐 ${new Date(s.ts).toLocaleString()}</div>
+        ${s.notes?`<div style="font-size:11px;color:var(--gray);margin-top:3px">📝 ${sanitize(s.notes)}</div>`:''}
+        <div class="arow">
+          <button class="btn btn-ok btn-sm" onclick="approvePending(${i})">✓ Approve</button>
+          <button class="btn btn-d btn-sm" onclick="rejectPending(${i})">✕ Reject</button>
+        </div>
+      </div>`;
+    }
     const ht=TM[s.homeId]||{name:s.homeId,conf:0},at=TM[s.awayId]||{name:s.awayId};
     return`<div class="pcard">
       <div class="pt">${sanitize(ht.name)} vs ${sanitize(at.name)} <span class="cb ${cClass(ht.conf)}">C${ht.conf}</span></div>
@@ -2925,7 +3155,7 @@ function editPlayinInfo(){
 
 function renderAll(){
   renderConfStandings();renderClassStandings();renderSchedule();renderResults();
-  updatePendingBubble();
+  updatePendingBubble();updateSubmitModeVisibility();
   if(isAdmin){
     renderAdminPanel();
     if(document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')){
@@ -3048,6 +3278,7 @@ function switchTab(name){
   document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===`panel-${name}`));
   if(name==='admin')renderAdminPanel();
   if(name==='results')renderResults();
+  if(name==='submit'){updateSubmitModeVisibility();if(_submitMode==='playoff')populatePoMatchups();}
   if(name==='playoffs')renderPlayoffsTab();
 }
 
