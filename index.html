@@ -2977,6 +2977,7 @@ function renderBracketAdminControls(){
 function toggleBracketVisible(cls,val){
   initBrackets();
   state.brackets[cls].visible=val;
+  if(typeof _skipBracketRestore!=='undefined') _skipBracketRestore=true;
   saveState();renderBracketAdminControls();renderPlayoffsTab();
   showToast(`Class ${cls} bracket ${val?'is now PUBLIC ✓':'set to Private'}`,(val?'':'tw'));
 }
@@ -3001,6 +3002,8 @@ function editRoundInfo(cls,ri){
   if(newVenue===null)return;
   cfg.rounds[ri].date=newDate.trim();
   cfg.rounds[ri].venue=newVenue.trim();
+  // Tell Firebase listener to skip the next bracket restore so our change isn't overwritten
+  if(typeof _skipBracketRestore!=='undefined') _skipBracketRestore=true;
   saveState();
   renderBracketAdminControls();
   renderPlayoffsTab();
@@ -3199,6 +3202,7 @@ function openMatchEdit(cls,key,ri,mi){
     }
   }
 
+  if(typeof _skipBracketRestore!=='undefined') _skipBracketRestore=true;
   saveState();
   renderPlayoffsTab();
   if(isAdmin&&document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')){
@@ -3520,6 +3524,7 @@ if(isFirebaseConfigured){
 
     // Listen for real-time updates — fires immediately on load then on every change
     let _fbInitialPush = false; // guard against infinite loop on first empty DB
+    let _skipBracketRestore = false; // set true when admin saves bracket data to prevent listener overwrite
     db.ref('ncgl2026').on('value', snapshot => {
       const data = snapshot.val();
       if(data){
@@ -3541,7 +3546,14 @@ if(isFirebaseConfigured){
           setTimeout(()=>saveState(),1000);
         }
         if(data.playoffSpots){state.playoffSpots=data.playoffSpots;PLAYOFF_SPOTS=state.playoffSpots;}
-        if(data.brackets) state.brackets=data.brackets;
+        if(data.brackets){
+          if(_skipBracketRestore){
+            // Admin just saved bracket data — skip this restore to prevent overwriting their change
+            _skipBracketRestore=false;
+          } else {
+            state.brackets=data.brackets;
+          }
+        }
         if(data.messages) state.messages=data.messages;
         // Clean up any stale zero-game archives (e.g. accidental 2027 archive)
         // This removes them from Firebase so they stop appearing for everyone
