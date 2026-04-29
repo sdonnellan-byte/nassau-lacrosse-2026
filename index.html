@@ -2769,66 +2769,143 @@ function renderBlankBracket(cls){
   const rounds=cfg.rounds||DEFAULT_BRACKET_CONFIG[cls].rounds;
   const size=cfg.size||(PLAYOFF_SPOTS[cls]||8);
   const byeSeeds=cfg.byeSeeds||(DEFAULT_BRACKET_CONFIG[cls]&&DEFAULT_BRACKET_CONFIG[cls].byeSeeds)||0;
+  const slots=cfg.slots||[]; // auto-synced from standings by _autoSyncBracket
+  const hasSeeds=slots.length>0;
   const numRounds=rounds.length;
+
+  // Build round structure with seed numbers in correct positions
   const allRounds=[];
-  if(byeSeeds>0){
-    const frGames=Math.floor((size-byeSeeds)/2);
-    const r0=[];
-    for(let i=0;i<frGames;i++) r0.push([{seed:'—',team:'TBD'},{seed:'—',team:'TBD'}]);
-    allRounds.push(r0);
-    const qfGames=Math.ceil((byeSeeds+frGames)/2);
-    const r1=[];
-    for(let i=0;i<qfGames;i++) r1.push([{seed:'—',team:'TBD'},{seed:'—',team:'TBD'}]);
-    allRounds.push(r1);
-    for(let r=2;r<numRounds;r++){
-      const prev=allRounds[r-1];
-      const rnd=[];
-      for(let m=0;m<Math.ceil(prev.length/2);m++) rnd.push([{seed:'—',team:'TBD'},{seed:'—',team:'TBD'}]);
-      if(!rnd.length) rnd.push([{seed:'—',team:'TBD'},{seed:'—',team:'TBD'}]);
-      allRounds.push(rnd);
-    }
-  } else {
-    const stdRounds=size<=4?2:size<=8?3:4;
-    const r0=[];
-    if(size===8){
-      // Correct order: 1v8, 4v5, 3v6, 2v7
-      [[1,8],[4,5],[3,6],[2,7]].forEach(([h,l])=>r0.push([{seed:h,team:'TBD'},{seed:l,team:'TBD'}]));
-    } else if(size===4){
-      r0.push([{seed:1,team:'TBD'},{seed:4,team:'TBD'}]);
-      r0.push([{seed:2,team:'TBD'},{seed:3,team:'TBD'}]);
-    } else {
-      const half=Math.ceil(size/2);
-      for(let i=0;i<half;i++) r0.push([{seed:i+1,team:'TBD'},{seed:size-i,team:'TBD'}]);
-    }
-    allRounds.push(r0);
-    for(let r=1;r<stdRounds;r++){
-      const prev=allRounds[r-1];
-      const rnd=[];
-      for(let m=0;m<Math.ceil(prev.length/2);m++) rnd.push([{seed:'',team:'TBD'},{seed:'',team:'TBD'}]);
-      if(!rnd.length) rnd.push([{seed:'',team:'TBD'},{seed:'',team:'TBD'}]);
-      allRounds.push(rnd);
-    }
-  }
   const champion=cfg.champion||`Class ${cls} Champions`;
+
+  if(byeSeeds>0){
+    // Class B: custom aligned layout — FR games pinned to top/bottom adjacent to their QF opponent
+    const s=(i)=>hasSeeds&&slots[i]?slots[i].seed:i+1;
+    const ft=hasSeeds?slots.slice(byeSeeds):[];
+    const fr0top=ft[1]?.seed||8; const fr0bot=ft[2]?.seed||9;   // 8v9
+    const fr1top=ft[0]?.seed||7; const fr1bot=ft[3]?.seed||10;  // 7v10
+    const roundTitleStyle=`font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--gray);text-align:center;padding:6px 0 10px`;
+    const mkSeedSlot=(seed,label)=>`<div class="bracket-slot">
+      <span class="bracket-seed" style="color:${seed?'var(--gold)':'var(--gray)'}">${seed||'—'}</span>
+      <span class="bracket-team" style="color:var(--gray);font-style:italic">${label||''}</span>
+    </div>`;
+    const mkFRSlot=(seed)=>`<div class="bracket-slot" style="background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.3)">
+      <span class="bracket-seed" style="color:var(--gold)">${seed}</span>
+      <span class="bracket-team" style="color:var(--gray);font-style:italic"></span>
+    </div>`;
+
+    const frInfo=rounds[0]||{name:'First Round',date:'',venue:''};
+    const qfInfo=rounds[1]||{name:'Quarter Finals',date:'',venue:''};
+    const sfInfo=rounds[2]||{name:'Semifinals',date:'',venue:''};
+    const finInfo=rounds[3]||{name:'Finals',date:'',venue:''};
+
+    let html=`<div class="bracket-wrap"><div style="display:flex;gap:0;align-items:stretch;min-width:700px">`;
+
+    // First Round column: 8v9 at top, 7v10 at bottom
+    html+=`<div style="display:flex;flex-direction:column;min-width:170px;flex-shrink:0">
+      <div style="${roundTitleStyle}">${frInfo.name}<br><small style="font-size:10px;font-weight:400">${frInfo.date||''}</small><br><small style="font-size:10px;color:var(--blue-lt)">${frInfo.venue||''}</small></div>
+      <div style="display:flex;flex-direction:column;height:100%;justify-content:space-between;padding:6px">
+        <div class="bracket-match">${mkFRSlot(fr0top)}${mkFRSlot(fr0bot)}</div>
+        <div style="flex:1"></div>
+        <div class="bracket-match">${mkFRSlot(fr1top)}${mkFRSlot(fr1bot)}</div>
+      </div>
+    </div>`;
+    html+=`<div style="display:flex;align-items:center;width:14px;flex-shrink:0"></div>`;
+
+    // QF column: 1 vs FR-winner, 4v5, 3v6, 2 vs FR-winner
+    html+=`<div style="display:flex;flex-direction:column;min-width:180px;flex-shrink:0">
+      <div style="${roundTitleStyle}">${qfInfo.name}<br><small style="font-size:10px;font-weight:400">${qfInfo.date||''}</small><br><small style="font-size:10px;color:var(--blue-lt)">${qfInfo.venue||''}</small></div>
+      <div style="display:flex;flex-direction:column;justify-content:space-around;flex:1;padding:6px;gap:6px">
+        <div class="bracket-match">${mkSeedSlot(s(0))}${mkSeedSlot('','FR Winner')}</div>
+        <div class="bracket-match">${mkSeedSlot(s(3))}${mkSeedSlot(s(4))}</div>
+        <div class="bracket-match">${mkSeedSlot(s(2))}${mkSeedSlot(s(5))}</div>
+        <div class="bracket-match">${mkSeedSlot(s(1))}${mkSeedSlot('','FR Winner')}</div>
+      </div>
+    </div>`;
+    html+=`<div style="display:flex;align-items:center;width:14px;flex-shrink:0"></div>`;
+
+    // SF column
+    html+=`<div style="display:flex;flex-direction:column;min-width:180px;flex-shrink:0">
+      <div style="${roundTitleStyle}">${sfInfo.name}<br><small style="font-size:10px;font-weight:400">${sfInfo.date||''}</small><br><small style="font-size:10px;color:var(--blue-lt)">${sfInfo.venue||''}</small></div>
+      <div style="display:flex;flex-direction:column;justify-content:space-around;flex:1;padding:6px;gap:6px">
+        <div class="bracket-match">${mkSeedSlot('')}${mkSeedSlot('')}</div>
+        <div class="bracket-match">${mkSeedSlot('')}${mkSeedSlot('')}</div>
+      </div>
+    </div>`;
+    html+=`<div style="display:flex;align-items:center;width:14px;flex-shrink:0"></div>`;
+
+    // Finals column
+    html+=`<div style="display:flex;flex-direction:column;min-width:180px;flex-shrink:0">
+      <div style="${roundTitleStyle}">${finInfo.name}<br><small style="font-size:10px;font-weight:400">${finInfo.date||''}</small><br><small style="font-size:10px;color:var(--blue-lt)">${finInfo.venue||''}</small></div>
+      <div style="display:flex;flex-direction:column;justify-content:center;flex:1;padding:6px">
+        <div class="bracket-match final">${mkSeedSlot('')}${mkSeedSlot('')}</div>
+      </div>
+    </div>`;
+
+    // Champion
+    html+=`<div style="display:flex;align-items:center;padding:0 8px;flex-shrink:0"><div class="bracket-champion">🏆<div><div style="font-size:11px;letter-spacing:2px">${champion}</div></div></div></div>`;
+    html+=`</div></div>`;
+
+    const champ=getConf4QualifiersForClass(cls);
+    if(champ&&isAdmin){
+      html+=`<div style="margin-top:14px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:11px 14px;font-size:12px;color:var(--gray);font-style:italic">
+        ⭐ <strong style="color:var(--gold)">Conf 4 Play-In game will appear here</strong> when bracket is published.
+      </div>`;
+    }
+    return html;
+  }
+
+  // Standard bracket (Class A, C, D)
+  const stdRounds=size<=4?2:size<=8?3:4;
+  const r0=[];
+  const s=(i)=>hasSeeds&&slots[i]?slots[i].seed:i+1;
+  if(size===8){
+    [[0,7],[3,4],[2,5],[1,6]].forEach(([hi,lo])=>r0.push([{seed:s(hi),team:''},{seed:s(lo),team:''}]));
+  } else if(size===4){
+    r0.push([{seed:s(0),team:''},{seed:s(3),team:''}]);
+    r0.push([{seed:s(1),team:''},{seed:s(2),team:''}]);
+  } else {
+    const half=Math.ceil(size/2);
+    for(let i=0;i<half;i++) r0.push([{seed:s(i),team:''},{seed:s(size-1-i),team:''}]);
+  }
+  allRounds.push(r0);
+  for(let r=1;r<stdRounds;r++){
+    const prev=allRounds[r-1];
+    const rnd=[];
+    for(let m=0;m<Math.ceil(prev.length/2);m++) rnd.push([{seed:'',team:''},{seed:'',team:''}]);
+    if(!rnd.length) rnd.push([{seed:'',team:''},{seed:'',team:''}]);
+    allRounds.push(rnd);
+  }
+
   let html=`<div class="bracket-wrap"><div class="bracket">`;
   allRounds.forEach((rnd,ri)=>{
     const rInfo=rounds[ri]||{name:`Round ${ri+1}`,date:'',venue:''};
     const isFinal=ri===allRounds.length-1;
     html+=`<div class="bracket-round"><div class="bracket-round-title">${rInfo.name}<small>${rInfo.date||''}</small><small style="color:var(--blue-lt)">${rInfo.venue||''}</small></div>`;
-    rnd.forEach(()=>{
-      html+=`<div class="bracket-match${isFinal?' final':''}">
-        <div class="bracket-slot"><span class="bracket-seed" style="color:var(--gray);font-size:11px">—</span><span class="bracket-team" style="color:var(--gray);font-style:italic">TBD</span></div>
-        <div class="bracket-slot"><span class="bracket-seed" style="color:var(--gray);font-size:11px">—</span><span class="bracket-team" style="color:var(--gray);font-style:italic">TBD</span></div>
-      </div>`;
+    rnd.forEach(pair=>{
+      html+=`<div class="bracket-match${isFinal?' final':''}">`;
+      pair.forEach(sl=>{
+        if(sl.seed){
+          html+=`<div class="bracket-slot">
+            <span class="bracket-seed" style="color:var(--gold)">${sl.seed}</span>
+            <span class="bracket-team" style="color:var(--gray);font-style:italic">${sl.team||''}</span>
+          </div>`;
+        } else {
+          html+=`<div class="bracket-slot">
+            <span class="bracket-seed" style="color:var(--gray)">—</span>
+            <span class="bracket-team" style="color:var(--gray);font-style:italic"></span>
+          </div>`;
+        }
+      });
+      html+=`</div>`;
     });
     html+=`</div>`;
     if(ri<allRounds.length-1) html+=`<div style="display:flex;align-items:center;width:14px;flex-shrink:0"></div>`;
   });
   html+=`<div style="display:flex;align-items:center;padding:0 8px;flex-shrink:0"><div class="bracket-champion">🏆<div><div style="font-size:11px;letter-spacing:2px">${champion}</div></div></div></div>`;
   html+=`</div></div>`;
+
   const champ=getConf4QualifiersForClass(cls);
   if(champ&&isAdmin){
-    // Admin still sees the note inside the blank bracket section
     html+=`<div style="margin-top:14px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:11px 14px;font-size:12px;color:var(--gray);font-style:italic">
       ⭐ <strong style="color:var(--gold)">Conf 4 Play-In game will appear here</strong> when bracket is published.
     </div>`;
