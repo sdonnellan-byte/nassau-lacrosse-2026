@@ -2050,6 +2050,24 @@ function initBrackets(){
     if(DEFAULT_BRACKET_CONFIG[cls].byeSeeds&&!state.brackets[cls].byeSeeds){
       state.brackets[cls].byeSeeds=DEFAULT_BRACKET_CONFIG[cls].byeSeeds;
     }
+    // Force-correct known wrong dates that may be cached in Firebase
+    // This runs on every load and pushes corrections back to Firebase automatically
+    const DATE_CORRECTIONS={
+      B:{1:{wrong:['Friday May 15, 2026','Friday May 15','Fri May 15, 2026'],correct:'Saturday May 16, 2026'}},
+      C:{0:{wrong:['Saturday May 16, 2026','Saturday May 16','Sat May 16, 2026'],correct:'Friday May 15, 2026'}},
+    };
+    let dateFixed=false;
+    if(DATE_CORRECTIONS[cls]){
+      Object.entries(DATE_CORRECTIONS[cls]).forEach(([ri,fix])=>{
+        const r=state.brackets[cls].rounds[parseInt(ri)];
+        if(r&&fix.wrong.includes(r.date)){
+          r.date=fix.correct;
+          dateFixed=true;
+        }
+      });
+    }
+    if(dateFixed) setTimeout(()=>{ if(typeof _skipBracketRestore!=='undefined') _skipBracketRestore=true; saveState(); },500);
+
     // Only auto-correct specific stale venues — NEVER touch dates (admin may have changed them)
     // This runs once to fix Firebase data saved before the Adelphi University correction
     const defRounds=DEFAULT_BRACKET_CONFIG[cls].rounds;
@@ -3002,12 +3020,19 @@ function editRoundInfo(cls,ri){
   if(newVenue===null)return;
   cfg.rounds[ri].date=newDate.trim();
   cfg.rounds[ri].venue=newVenue.trim();
-  // Tell Firebase listener to skip the next bracket restore so our change isn't overwritten
+  // Write ONLY the rounds array for this class directly to Firebase
+  // This avoids the full saveState() race condition
   if(typeof _skipBracketRestore!=='undefined') _skipBracketRestore=true;
-  saveState();
+  if(window._fbDB){
+    window._fbDB.ref(`ncgl2026/brackets/${cls}/rounds`).set(cfg.rounds)
+      .then(()=>showToast(`✓ ${r.name} saved permanently`))
+      .catch(()=>{ saveState(); showToast(`✓ ${r.name} updated`); });
+  } else {
+    saveState();
+    showToast(`✓ ${r.name} updated`);
+  }
   renderBracketAdminControls();
   renderPlayoffsTab();
-  showToast(`✓ ${r.name} updated`);
 }
 
 function resetBracket(cls){
