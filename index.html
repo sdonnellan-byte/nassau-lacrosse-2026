@@ -2050,13 +2050,14 @@ function initBrackets(){
     if(DEFAULT_BRACKET_CONFIG[cls].byeSeeds&&!state.brackets[cls].byeSeeds){
       state.brackets[cls].byeSeeds=DEFAULT_BRACKET_CONFIG[cls].byeSeeds;
     }
-    // Fix stale venues: auto-correct any round still @ HS or @ TBD where default is now @ Adelphi University
+    // Only auto-correct specific stale venues — NEVER touch dates (admin may have changed them)
+    // This runs once to fix Firebase data saved before the Adelphi University correction
     const defRounds=DEFAULT_BRACKET_CONFIG[cls].rounds;
     (state.brackets[cls].rounds||[]).forEach((r,ri)=>{
       if(defRounds[ri]&&(r.venue==='@ HS'||r.venue==='@ TBD')&&defRounds[ri].venue==='@ Adelphi University'){
         r.venue='@ Adelphi University';
       }
-      if(defRounds[ri]&&!r.date) r.date=defRounds[ri].date;
+      // Do NOT touch r.date here — admin may have changed it and we must preserve their value
     });
   });
 }
