@@ -2066,7 +2066,7 @@ function initBrackets(){
         }
       });
     }
-    if(dateFixed) setTimeout(()=>{ if(typeof _skipBracketRestore!=='undefined') _skipBracketRestore=true; saveState(); },500);
+    if(dateFixed) setTimeout(()=>{ _bracketSaveTime=Date.now(); saveState(); },500);
 
     // Only auto-correct specific stale venues — NEVER touch dates (admin may have changed them)
     // This runs once to fix Firebase data saved before the Adelphi University correction
@@ -2995,7 +2995,7 @@ function renderBracketAdminControls(){
 function toggleBracketVisible(cls,val){
   initBrackets();
   state.brackets[cls].visible=val;
-  if(typeof _skipBracketRestore!=='undefined') _skipBracketRestore=true;
+  _bracketSaveTime=Date.now();
   saveState();renderBracketAdminControls();renderPlayoffsTab();
   showToast(`Class ${cls} bracket ${val?'is now PUBLIC ✓':'set to Private'}`,(val?'':'tw'));
 }
@@ -3022,7 +3022,7 @@ function editRoundInfo(cls,ri){
   cfg.rounds[ri].venue=newVenue.trim();
   // Write ONLY the rounds array for this class directly to Firebase
   // This avoids the full saveState() race condition
-  if(typeof _skipBracketRestore!=='undefined') _skipBracketRestore=true;
+  _bracketSaveTime=Date.now();
   if(window._fbDB){
     window._fbDB.ref(`ncgl2026/brackets/${cls}/rounds`).set(cfg.rounds)
       .then(()=>showToast(`✓ ${r.name} saved permanently`))
@@ -3227,7 +3227,7 @@ function openMatchEdit(cls,key,ri,mi){
     }
   }
 
-  if(typeof _skipBracketRestore!=='undefined') _skipBracketRestore=true;
+  _bracketSaveTime=Date.now();
   saveState();
   renderPlayoffsTab();
   if(isAdmin&&document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')){
@@ -3549,7 +3549,7 @@ if(isFirebaseConfigured){
 
     // Listen for real-time updates — fires immediately on load then on every change
     let _fbInitialPush = false; // guard against infinite loop on first empty DB
-    let _skipBracketRestore = false; // set true when admin saves bracket data to prevent listener overwrite
+    let _bracketSaveTime = 0; // timestamp of last admin bracket save — ignore Firebase restores for 3s after
     db.ref('ncgl2026').on('value', snapshot => {
       const data = snapshot.val();
       if(data){
@@ -3572,9 +3572,10 @@ if(isFirebaseConfigured){
         }
         if(data.playoffSpots){state.playoffSpots=data.playoffSpots;PLAYOFF_SPOTS=state.playoffSpots;}
         if(data.brackets){
-          if(_skipBracketRestore){
-            // Admin just saved bracket data — skip this restore to prevent overwriting their change
-            _skipBracketRestore=false;
+          // Skip restoring brackets if admin saved within the last 3 seconds
+          // This prevents the Firebase echo from overwriting admin's just-saved data
+          if(Date.now()-_bracketSaveTime < 3000){
+            // Within protection window — skip restore but keep the timer running
           } else {
             state.brackets=data.brackets;
           }
