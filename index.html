@@ -3572,10 +3572,17 @@ if(isFirebaseConfigured){
         }
         if(data.playoffSpots){state.playoffSpots=data.playoffSpots;PLAYOFF_SPOTS=state.playoffSpots;}
         if(data.brackets){
-          // Skip restoring brackets if admin saved within the last 3 seconds
-          // This prevents the Firebase echo from overwriting admin's just-saved data
+          // Skip restoring bracket ROUNDS/VISIBLE during admin save window to prevent race condition
+          // BUT always restore matchResults (scores) — those should never be blocked
           if(Date.now()-_bracketSaveTime < 3000){
-            // Within protection window — skip restore but keep the timer running
+            // Within protection window — restore only matchResults and slots, not rounds/visible
+            ['A','B','C','D'].forEach(cls=>{
+              if(data.brackets[cls]&&state.brackets[cls]){
+                if(data.brackets[cls].matchResults) state.brackets[cls].matchResults=data.brackets[cls].matchResults;
+                if(data.brackets[cls].slots) state.brackets[cls].slots=data.brackets[cls].slots;
+                if(data.brackets[cls].playinMatch!==undefined) state.brackets[cls].playinMatch=data.brackets[cls].playinMatch;
+              }
+            });
           } else {
             state.brackets=data.brackets;
           }
