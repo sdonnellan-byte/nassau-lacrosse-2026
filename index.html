@@ -2066,7 +2066,19 @@ function initBrackets(){
         }
       });
     }
-    if(dateFixed) setTimeout(()=>{ _bracketSaveTime=Date.now(); saveState(); },500);
+    if(dateFixed){
+      // Write ONLY the corrected rounds — never write full state which could overwrite matchResults
+      setTimeout(()=>{
+        _bracketSaveTime=Date.now();
+        if(window._fbDB){
+          ['A','B','C','D'].forEach(c2=>{
+            if(state.brackets[c2]&&state.brackets[c2].rounds){
+              window._fbDB.ref('ncgl2026/brackets/'+c2+'/rounds').set(state.brackets[c2].rounds).catch(()=>{});
+            }
+          });
+        }
+      },500);
+    }
 
     // Only auto-correct specific stale venues — NEVER touch dates (admin may have changed them)
     // This runs once to fix Firebase data saved before the Adelphi University correction
@@ -3579,22 +3591,28 @@ if(isFirebaseConfigured){
         state.archives = _cleanArcs;
         if(_cleanArcs.length!==_rawArcs.length){
           // Stale auto-archives found in Firebase — push fix back so everyone sees clean data
-          setTimeout(()=>saveState(),1000);
+          // Write only the cleaned archives — not the whole state (which could overwrite bracket scores)
+          setTimeout(()=>{
+            if(window._fbDB) window._fbDB.ref('ncgl2026/archives').set(state.archives).catch(()=>{});
+          },1000);
         }
         if(data.playoffSpots){state.playoffSpots=data.playoffSpots;PLAYOFF_SPOTS=state.playoffSpots;}
         if(data.brackets){
-          // Skip restoring bracket ROUNDS/VISIBLE during admin save window to prevent race condition
-          // BUT always restore matchResults (scores) — those should never be blocked
           if(Date.now()-_bracketSaveTime < 3000){
-            // Within protection window — restore only matchResults and slots, not rounds/visible
+            // Within save protection window — restore matchResults and slots always,
+            // but skip restoring rounds/visible to avoid overwriting admin's just-saved date/venue
             ['A','B','C','D'].forEach(cls=>{
               if(data.brackets[cls]&&state.brackets[cls]){
-                if(data.brackets[cls].matchResults) state.brackets[cls].matchResults=data.brackets[cls].matchResults;
+                // Always restore scores — never block these
+                if(data.brackets[cls].matchResults!==undefined) state.brackets[cls].matchResults=data.brackets[cls].matchResults||{};
                 if(data.brackets[cls].slots) state.brackets[cls].slots=data.brackets[cls].slots;
                 if(data.brackets[cls].playinMatch!==undefined) state.brackets[cls].playinMatch=data.brackets[cls].playinMatch;
+                // Also restore visible (toggle state)
+                if(data.brackets[cls].visible!==undefined) state.brackets[cls].visible=data.brackets[cls].visible;
               }
             });
           } else {
+            // Normal restore — take everything from Firebase
             state.brackets=data.brackets;
           }
         }
