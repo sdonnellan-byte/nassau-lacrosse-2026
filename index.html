@@ -3162,7 +3162,9 @@ function openMatchEdit(cls,key,ri,mi){
       // Remove this result and cascade-clear downstream
       delete cfg.matchResults[key];
       clearMatchCascade(cls,ri,mi);
-      saveState();
+      _bracketSaveTime=Date.now();
+      if(window._fbDB){window._fbDB.ref(`ncgl2026/brackets/${cls}/matchResults`).set(cfg.matchResults).catch(e=>saveState());}else{saveState();}
+      try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
       renderPlayoffsTab();
       if(isAdmin&&document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')) renderBracketAdminControls();
       showToast(`✓ Result cleared — bracket retracted`,'tw');
@@ -3191,7 +3193,9 @@ function openMatchEdit(cls,key,ri,mi){
       const nextSt=cfg.matchResults[nk];
       if(!nextSt.topScore&&!nextSt.botScore) nextSt[slot]=wName;
     }
-    saveState();
+    _bracketSaveTime=Date.now();
+    if(window._fbDB){window._fbDB.ref(`ncgl2026/brackets/${cls}/matchResults`).set(cfg.matchResults).catch(e=>saveState());}else{saveState();}
+    try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
     renderPlayoffsTab();
     if(isAdmin&&document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')) renderBracketAdminControls();
     showToast(`✓ ${topName} ${tsv??'—'}–${bsv??'—'} ${botName}`);
@@ -3220,15 +3224,22 @@ function openMatchEdit(cls,key,ri,mi){
     const slot=mi%2===0?'top':'bot';
     const nk=`r${nextRi}m${nextMi}`;
     if(!cfg.matchResults[nk]) cfg.matchResults[nk]={};
-    // Only overwrite if game hasn't been played yet (don't erase entered scores)
     const nextSt=cfg.matchResults[nk];
     if(!nextSt.topScore&&!nextSt.botScore){
       nextSt[slot]=wName;
     }
   }
 
+  // Write matchResults directly to Firebase path — bypasses race condition completely
   _bracketSaveTime=Date.now();
-  saveState();
+  if(window._fbDB){
+    window._fbDB.ref(`ncgl2026/brackets/${cls}/matchResults`).set(cfg.matchResults)
+      .catch(e=>{ console.error('Score save error:',e); saveState(); });
+  } else {
+    saveState();
+  }
+  // Also update localStorage immediately
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
   renderPlayoffsTab();
   if(isAdmin&&document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')){
     renderBracketAdminControls();
