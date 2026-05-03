@@ -2687,6 +2687,9 @@ function downloadBracketsPDF(){
 function renderPlayoffsTab(highlightCls){
   const el=document.getElementById('playoffs-content');if(!el)return;
   initBrackets();
+  // Always sync slots from current standings before rendering
+  // This ensures the correct teams show whether viewing as public or admin
+  try{['A','B','C','D'].forEach(cls=>_autoSyncBracket(cls));}catch(e){console.warn('bracket sync:',e);}
   const year=state.year||2026;
   const clsColors={A:'var(--cA)',B:'var(--cB)',C:'var(--cC)',D:'var(--cD)'};
   const piDate=state.playinDate||'Tuesday, May 14, 2026';
