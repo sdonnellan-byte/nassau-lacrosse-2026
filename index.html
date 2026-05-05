@@ -607,6 +607,10 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
 <div class="toast" id="toast"></div>
 
 <script>
+// ── CRITICAL GLOBALS — must be declared before any function references them ──
+var _bracketSaveTime = 0;       // protects bracket saves from Firebase race condition
+var _suppressConfRerender = false; // prevents conf panel re-render during save
+// ─────────────────────────────────────────────────────────────────────────────
 // ── DEFAULT TEAMS (51, verified from Excel) ──────────────────────────────────
 const DEFAULT_TEAMS=[
   {id:'GC',name:'Garden City',conf:1,cls:'B'},
@@ -3679,7 +3683,7 @@ if(isFirebaseConfigured){
 
     // Listen for real-time updates — fires immediately on load then on every change
     let _fbInitialPush = false; // guard against infinite loop on first empty DB
-    let _bracketSaveTime = 0; // timestamp of last admin bracket save — ignore Firebase restores for 3s after
+    _bracketSaveTime = 0; // reset on Firebase init
     db.ref('ncgl2026').on('value', snapshot => {
       const data = snapshot.val();
       if(data){
