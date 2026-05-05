@@ -3679,6 +3679,18 @@ function setFBBanner(status){
 // ── INIT WITH FIREBASE ────────────────────────────────────────────────────
 try{
   updateTitle();initSelects();renderAll();
+  // Diagnostic: show what loaded
+  const diagEl=document.getElementById('conf-standings');
+  if(diagEl&&diagEl.innerHTML===''){
+    diagEl.innerHTML=`<div style="color:white;padding:20px;font-family:monospace;font-size:12px">
+      TEAMS count: ${TEAMS.length}<br>
+      state.games count: ${(state.games||[]).length}<br>
+      state.games played: ${(state.games||[]).filter(g=>g.played).length}<br>
+      TM keys: ${Object.keys(TM).length}<br>
+      PLAYOFF_SPOTS: ${JSON.stringify(PLAYOFF_SPOTS)}<br>
+      confs: ${[...new Set(TEAMS.map(t=>t.conf))].sort().join(',')}<br>
+    </div>`;
+  }
 }catch(e){
   console.error('STARTUP CRASH:',e);
   document.body.insertAdjacentHTML('afterbegin',`<div style="background:red;color:white;padding:20px;font-family:monospace;font-size:14px;z-index:99999;position:fixed;top:0;left:0;right:0">STARTUP ERROR: ${e.message}<br>${e.stack||''}</div>`);
