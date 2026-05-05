@@ -1098,7 +1098,15 @@ function adminSubmitScore(){
   }
 
   if(g.home===hId){g.homeScore=hs;g.awayScore=as;}else{g.homeScore=as;g.awayScore=hs;}
-  g.played=true;saveState();renderAll();
+  g.played=true;
+  // Write games directly to Firebase — avoids race condition with full saveState
+  if(window._fbDB){
+    window._fbDB.ref('ncgl2026/games').set(state.games).catch(()=>saveState());
+  } else {
+    saveState();
+  }
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+  renderAll();
   showToast(`✓ ${TM[hId].name} ${hs}–${as} ${TM[aId].name}`);
   document.getElementById('adm-exist').style.display='none';
   document.getElementById('adm-err').style.display='none';
@@ -1138,7 +1146,10 @@ function approvePending(i){
     if(!confirm(`⚠️ This game already has a result: ${TM[g.home]?.name||g.home} ${g.homeScore}–${g.awayScore} ${TM[g.away]?.name||g.away}.\n\nApproving will overwrite it. Continue?`))return;
   }
   if(g.home===s.homeId){g.homeScore=s.homeScore;g.awayScore=s.awayScore;}else{g.homeScore=s.awayScore;g.awayScore=s.homeScore;}
-  g.played=true;state.pending.splice(i,1);saveState();renderAll();showToast('✓ Score approved');
+  g.played=true;state.pending.splice(i,1);
+  if(window._fbDB){window._fbDB.ref('ncgl2026/games').set(state.games).catch(()=>saveState());}else{saveState();}
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+  renderAll();showToast('✓ Score approved');
 }
 function rejectPending(i){if(!confirm('Reject?'))return;state.pending.splice(i,1);saveState();renderAll();showToast('Rejected','tw');}
 
@@ -1362,13 +1373,18 @@ function saveEdit(){
   if(!editGameId)return;const g=state.games.find(x=>x.id===editGameId);if(!g)return;
   g.homeScore=clampScore(document.getElementById('edit-hs').value);
   g.awayScore=clampScore(document.getElementById('edit-as').value);
-  g.played=true;saveState();renderAll();closeEdit();showToast('✓ Score updated');
+  g.played=true;
+  if(window._fbDB){window._fbDB.ref('ncgl2026/games').set(state.games).catch(()=>saveState());}else{saveState();}
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+  renderAll();closeEdit();showToast('✓ Score updated');
 }
 function deleteResult(){
   if(!editGameId||!confirm('Remove this result?'))return;
   const g=state.games.find(x=>x.id===editGameId);if(!g)return;
   g.played=false;g.homeScore=null;g.awayScore=null;
-  saveState();renderAll();closeEdit();showToast('Result removed','tw');
+  if(window._fbDB){window._fbDB.ref('ncgl2026/games').set(state.games).catch(()=>saveState());}else{saveState();}
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+  renderAll();closeEdit();showToast('Result removed','tw');
 }
 
 // ── CONFERENCE MANAGER ────────────────────────────────────────────────────
