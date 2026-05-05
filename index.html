@@ -1567,7 +1567,7 @@ function renderPlayoffRulesEditor(){
   const modeColors={allQualify:'var(--cA)',fillSpots:'var(--cC)',playIn:'var(--gold)',noQualify:'var(--gray)'};
 
   el.innerHTML=confs.map(conf=>{
-    const rule=rules[conf]||{mode:'fillSpots'};
+    const rule=rules[conf]||rules[String(conf)]||{mode:'fillSpots'};
     return`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--navy);border:1px solid var(--border);border-radius:8px;padding:10px 13px">
       <span style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:14px;min-width:90px">
         <span class="cb ${cClass(conf)}">Conf ${conf}</span>
@@ -2221,15 +2221,11 @@ function getBracketSeeds(cls){
   const blocks=confs.map(c=>({conf:c,ids:sortTeams(TEAMS.filter(t=>t.cls===cls&&t.conf===c&&!t._ph).map(t=>t.id),rec)}));
   const seeded=[];
   blocks.forEach(({conf,ids})=>{
-    const rule=rules[conf]||{mode:'fillSpots'};
-    // allQualify: all teams from this conf get seeds
-    // fillSpots: teams fill remaining spots (added to seeded pool, capped by bracket size)
-    // playIn: conf champion gets play-in (handled separately) — don't add to seeded pool
-    // noQualify: skip entirely
+    // Coerce conf to string for Firebase-restored rules (Firebase stores keys as strings)
+    const rule=rules[conf]||rules[String(conf)]||{mode:'fillSpots'};
     if(rule.mode==='allQualify'||rule.mode==='fillSpots'){
       ids.forEach(id=>seeded.push({id,conf}));
     }
-    // playIn and noQualify: don't add to main seeded pool
   });
   const spots=state.brackets[cls].size||(PLAYOFF_SPOTS[cls]||8);
   return seeded.slice(0,spots);
@@ -2244,8 +2240,11 @@ function getBracketSeeds(cls){
 function getConf4QualifiersForClass(cls){
   const rec=computeStandings();
   const rules=state.playoffRules||DEFAULT_PLAYOFF_RULES;
-  // Find all conferences configured as playIn
-  const playInConfs=Object.entries(rules).filter(([,r])=>r.mode==='playIn').map(([c])=>parseInt(c));
+  // Find all conferences configured as playIn — handle both int and string keys
+  const playInConfs=Object.entries(rules)
+    .filter(([,r])=>r&&r.mode==='playIn')
+    .map(([c])=>parseInt(c))
+    .filter(c=>!isNaN(c));
   if(!playInConfs.length) return null;
   const playInTeams=TEAMS.filter(t=>playInConfs.includes(t.conf)&&!t._ph);
   if(!playInTeams.length) return null;
@@ -3384,17 +3383,20 @@ function editPlayinInfo(){
 }
 
 function renderAll(){
-  renderConfStandings();renderClassStandings();renderSchedule();renderResults();
+  try{renderConfStandings();}catch(e){console.error('renderConfStandings:',e);}
+  try{renderClassStandings();}catch(e){console.error('renderClassStandings:',e);}
+  try{renderSchedule();}catch(e){console.error('renderSchedule:',e);}
+  try{renderResults();}catch(e){console.error('renderResults:',e);}
   updatePendingBubble();updateSubmitModeVisibility();
   if(isAdmin){
-    renderAdminPanel();
+    try{renderAdminPanel();}catch(e){console.error('renderAdminPanel:',e);}
     if(document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')){
-      renderBracketAdminControls();
+      try{renderBracketAdminControls();}catch(e){console.error('renderBracketAdminControls:',e);}
     }
   }
   updateTitle();initSelects();
   initBrackets();
-  renderPlayoffsTab();
+  try{renderPlayoffsTab();}catch(e){console.error('renderPlayoffsTab:',e);}
 }
 
 // ── EXPORT CSV ────────────────────────────────────────────────────────────
