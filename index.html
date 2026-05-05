@@ -866,6 +866,10 @@ if(_localPlayed===0){try{localStorage.removeItem(SK);}catch(e){}}
 // Live reference — always read from state so admin edits take effect immediately
 let PLAYOFF_SPOTS=state.playoffSpots;
 
+// Null-safe helpers to prevent crashes if data is missing
+function safeGames(){return state.games||[];}
+function safeTM(id){return TM[id]||{name:id||'Unknown',conf:0,cls:'?',id:id};}
+
 // ── TITLE ──────────────────────────────────────────────────────────────────
 function updateTitle(){
   const y=state.year||2026;
