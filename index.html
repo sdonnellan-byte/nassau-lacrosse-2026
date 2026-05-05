@@ -1134,7 +1134,17 @@ function approvePending(i){
     if(!cfg.matchResults[nk]) cfg.matchResults[nk]={};
     if(!cfg.matchResults[nk].topScore&&!cfg.matchResults[nk].botScore) cfg.matchResults[nk][slot]=wName;
     state.pending.splice(i,1);
-    saveState();renderAll();
+    _bracketSaveTime=Date.now();
+    if(window._fbDB){
+      window._fbDB.ref('ncgl2026').update({
+        [`brackets/${s.playoffCls}/matchResults`]: cfg.matchResults,
+        pending: state.pending
+      }).catch(()=>saveState());
+    } else {
+      saveState();
+    }
+    try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+    renderAll();
     showToast(`✓ Playoff score approved — ${wName} advances`);
     return;
   }
@@ -1147,11 +1157,29 @@ function approvePending(i){
   }
   if(g.home===s.homeId){g.homeScore=s.homeScore;g.awayScore=s.awayScore;}else{g.homeScore=s.awayScore;g.awayScore=s.homeScore;}
   g.played=true;state.pending.splice(i,1);
-  if(window._fbDB){window._fbDB.ref('ncgl2026/games').set(state.games).catch(()=>saveState());}else{saveState();}
+  if(window._fbDB){
+    // Write both games and pending atomically so neither can restore stale data
+    window._fbDB.ref('ncgl2026').update({
+      games: state.games,
+      pending: state.pending
+    }).catch(()=>saveState());
+  } else {
+    saveState();
+  }
   try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
   renderAll();showToast('✓ Score approved');
 }
-function rejectPending(i){if(!confirm('Reject?'))return;state.pending.splice(i,1);saveState();renderAll();showToast('Rejected','tw');}
+function rejectPending(i){
+  if(!confirm('Reject?'))return;
+  state.pending.splice(i,1);
+  if(window._fbDB){
+    window._fbDB.ref('ncgl2026/pending').set(state.pending).catch(()=>saveState());
+  } else {
+    saveState();
+  }
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+  renderAll();showToast('Rejected','tw');
+}
 
 function coachSubmit(){
   const email=document.getElementById('sub-email').value.trim();
@@ -1191,7 +1219,9 @@ function coachSubmit(){
   }
 
   state.pending.push({homeId:hId,awayId:aId,homeScore:hs,awayScore:as,email,notes,ts:Date.now()});
-  saveState();renderAll();
+  if(window._fbDB){window._fbDB.ref('ncgl2026/pending').set(state.pending).catch(()=>saveState());}else{saveState();}
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+  renderAll();
   document.getElementById('sub-email').value='';
   document.getElementById('sub-hs').value=0;document.getElementById('sub-as').value=0;
   document.getElementById('sub-notes').value='';
@@ -1338,7 +1368,9 @@ function coachSubmitPlayoff(){
     playoffCls:m.cls,playoffKey:m.key,playoffRi:m.ri,playoffMi:m.mi,
     isPlayoff:true
   });
-  saveState();updatePendingBubble();
+  if(window._fbDB){window._fbDB.ref('ncgl2026/pending').set(state.pending).catch(()=>saveState());}else{saveState();}
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+  updatePendingBubble();
   document.getElementById('sub-po-email').value='';
   document.getElementById('sub-po-hs').value=0;
   document.getElementById('sub-po-as').value=0;
