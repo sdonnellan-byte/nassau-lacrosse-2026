@@ -851,6 +851,7 @@ function saveState(){
       archives:state.archives||[],
       playoffSpots:state.playoffSpots||DEFAULT_PLAYOFF_SPOTS,
       confRules:state.confRules||{1:'allQualify',2:'allQualify',3:'fillSpots',4:'playIn'},
+      standingsOverrides:state.standingsOverrides||{},
       brackets:state.brackets||{},
       messages:state.messages||[],
       playinDate:state.playinDate||'Tuesday, May 14, 2026',
@@ -865,6 +866,7 @@ if(!state.pending)state.pending=[];
 if(!state.archives)state.archives=[];
 if(!state.playoffSpots)state.playoffSpots={...DEFAULT_PLAYOFF_SPOTS};
 if(!state.confRules)state.confRules={1:'allQualify',2:'allQualify',3:'fillSpots',4:'playIn'};
+if(!state.standingsOverrides)state.standingsOverrides={};
 if(!state.brackets)state.brackets=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG));
 if(!state.messages)state.messages=[];
 if(!state.playinDate)state.playinDate='Tuesday, May 14, 2026';
@@ -948,22 +950,126 @@ function computeStandings(){
   return rec;
 }
 
+// ── TIEBREAKER LOGIC ─────────────────────────────────────────────────────────
+// For 2-way ties: H2H direct record → best power win → wins → losses
+// For 3+ way ties: H2H record among tied group → best power win among group → record vs each other → wins → losses
+
+function powerWinScore(id, opponentIds, rec){
+  // Returns the "power win" score: sum of opponent win-pcts for every win against opponents in the group
+  let score=0;
+  opponentIds.forEach(oppId=>{
+    const h2h=rec[id]&&rec[id].h2h[oppId];
+    if(h2h&&h2h.w>0){
+      const oppRec=rec[oppId];
+      const oppG=oppRec?oppRec.w+oppRec.l+oppRec.t:0;
+      const oppPct=oppG>0?oppRec.w/oppG:0;
+      score+=oppPct*h2h.w; // credit per win weighted by opponent's win%
+    }
+  });
+  return score;
+}
+
+function h2hWinPctAmongGroup(id, groupIds, rec){
+  // Win% in head-to-head games against all others in the tied group
+  let w=0,l=0,t=0;
+  groupIds.forEach(oppId=>{
+    if(oppId===id) return;
+    const h2h=rec[id]&&rec[id].h2h[oppId];
+    if(h2h){w+=h2h.w;l+=h2h.l;t+=h2h.t;}
+  });
+  const g=w+l+t;
+  return g>0?w/g:-1; // -1 means no h2h games played
+}
+
 function sortTeams(ids,rec){
-  return[...ids].sort((a,b)=>{
+  if(ids.length<=1) return[...ids];
+
+  // Step 1: sort by overall win% first to group ties
+  const sorted=[...ids].sort((a,b)=>{
     const ra=rec[a],rb=rec[b];if(!ra||!rb)return 0;
     const ga=ra.w+ra.l+ra.t,gb=rb.w+rb.l+rb.t;
     const pa=ga>0?ra.w/ga:0,pb=gb>0?rb.w/gb:0;
-    // 1) Win percentage
-    if(pb!==pa)return pb-pa;
-    // 2) Head-to-head
-    const hh=ra.h2h[b];
-    if(hh&&(hh.w+hh.l+hh.t)>0){if(hh.w>hh.l)return -1;if(hh.l>hh.w)return 1;}
-    // 3) Most wins (2-0 ranks above 1-0)
-    if(rb.w!==ra.w)return rb.w-ra.w;
-    // 4) Fewest losses (0-2 ranks above 0-3)
-    if(ra.l!==rb.l)return ra.l-rb.l;
-    return 0;
+    if(Math.abs(pb-pa)>0.0001) return pb-pa;
+    return 0; // tied — will be resolved below
   });
+
+  // Step 2: find groups of tied teams (same win%) and sort each group
+  const result=[];
+  let i=0;
+  while(i<sorted.length){
+    const ra=rec[sorted[i]];
+    const ga=ra?ra.w+ra.l+ra.t:0;
+    const pa=ga>0?ra.w/ga:0;
+    // Gather all teams tied with sorted[i]
+    let j=i;
+    while(j<sorted.length){
+      const rj=rec[sorted[j]];
+      const gj=rj?rj.w+rj.l+rj.t:0;
+      const pj=gj>0?rj.w/gj:0;
+      if(Math.abs(pj-pa)>0.0001) break;
+      j++;
+    }
+    const tiedGroup=sorted.slice(i,j);
+
+    if(tiedGroup.length===1){
+      result.push(tiedGroup[0]);
+    } else if(tiedGroup.length===2){
+      // 2-way: direct H2H → power win → wins → losses
+      const[a,b]=tiedGroup;
+      const hh=rec[a]&&rec[a].h2h[b];
+      if(hh&&(hh.w+hh.l+hh.t)>0){
+        if(hh.w>hh.l) result.push(a,b);
+        else if(hh.l>hh.w) result.push(b,a);
+        else {
+          // H2H tied — power win
+          const pa2=powerWinScore(a,[b],rec),pb2=powerWinScore(b,[a],rec);
+          if(pa2!==pb2) pa2>pb2?result.push(a,b):result.push(b,a);
+          else {
+            const ra2=rec[a],rb2=rec[b];
+            if(ra2.w!==rb2.w) ra2.w>rb2.w?result.push(a,b):result.push(b,a);
+            else ra2.l<=rb2.l?result.push(a,b):result.push(b,a);
+          }
+        }
+      } else {
+        // No H2H game played — power win → wins → losses
+        const pa2=powerWinScore(a,[b],rec),pb2=powerWinScore(b,[a],rec);
+        if(pa2!==pb2) pa2>pb2?result.push(a,b):result.push(b,a);
+        else {
+          const ra2=rec[a],rb2=rec[b];
+          if(ra2.w!==rb2.w) ra2.w>rb2.w?result.push(a,b):result.push(b,a);
+          else ra2.l<=rb2.l?result.push(a,b):result.push(b,a);
+        }
+      }
+    } else {
+      // 3+ way tie: H2H win% among group → best power win → record vs each other → wins → losses
+      const breakTied=tiedGroup.sort((a,b2)=>{
+        // 1) H2H win% among the tied group
+        const ha=h2hWinPctAmongGroup(a,tiedGroup,rec);
+        const hb=h2hWinPctAmongGroup(b2,tiedGroup,rec);
+        if(ha>=0&&hb>=0&&Math.abs(ha-hb)>0.0001) return hb-ha;
+        // 2) Power win score against opponents in the group
+        const opponents=tiedGroup.filter(x=>x!==a&&x!==b2);
+        const pa2=powerWinScore(a,tiedGroup.filter(x=>x!==a),rec);
+        const pb2=powerWinScore(b2,tiedGroup.filter(x=>x!==b2),rec);
+        if(Math.abs(pa2-pb2)>0.0001) return pb2-pa2;
+        // 3) Record against each other (H2H wins among group)
+        let wa=0,wb2=0;
+        tiedGroup.forEach(opp=>{
+          if(opp!==a){const h=rec[a]&&rec[a].h2h[opp];if(h)wa+=h.w;}
+          if(opp!==b2){const h=rec[b2]&&rec[b2].h2h[opp];if(h)wb2+=h.w;}
+        });
+        if(wa!==wb2) return wb2-wa;
+        // 4) Overall wins
+        const ra2=rec[a],rb3=rec[b2];
+        if(ra2.w!==rb3.w) return rb3.w-ra2.w;
+        // 5) Fewest losses
+        return ra2.l-rb3.l;
+      });
+      breakTied.forEach(t=>result.push(t));
+    }
+    i=j;
+  }
+  return result;
 }
 function pctStr(r){const g=r.w+r.l+r.t;return g>0?(r.w/g).toFixed(3).replace(/^0/,''):'.000';}
 function cColor(c){return['#f59e0b','#3b82f6','#10b981','#a855f7','#ec4899','#06b6d4'][(c-1)%6];}
@@ -1804,6 +1910,94 @@ function closeArcView(){document.getElementById('arc-ov').classList.add('hidden'
 document.getElementById('arc-ov').addEventListener('click',e=>{if(e.target===document.getElementById('arc-ov'))closeArcView();});
 
 // ── RENDER: CONFERENCE STANDINGS ──────────────────────────────────────────
+// ── STANDINGS OVERRIDES ───────────────────────────────────────────────────────
+// Applies manual admin ordering on top of algorithmic sort.
+// Override key: "conf_1", "cls_A" etc. Value: ordered array of team IDs.
+// Admin can move teams up/down; non-tied teams cannot be moved past each other.
+function sortWithOverrides(ids, rec, key){
+  const base=sortTeams(ids,rec);
+  const overrides=state.standingsOverrides&&state.standingsOverrides[key];
+  if(!overrides||!overrides.length) return base;
+
+  // Build ordered list: use override order but only swap teams with identical win%
+  const result=[...base];
+  const pct=(id)=>{const r=rec[id];if(!r)return 0;const g=r.w+r.l+r.t;return g>0?r.w/g:0;};
+
+  // For each position in the override list, try to honour the order
+  // Only allow swaps between teams with the same win%
+  overrides.forEach(tid=>{
+    const curPos=result.indexOf(tid);
+    if(curPos<0) return;
+    const targetPos=overrides.indexOf(tid);
+    if(targetPos<0||targetPos===curPos) return;
+    // Move toward target position, only swapping with equal-pct teams
+    const dir=targetPos<curPos?-1:1;
+    let pos=curPos;
+    while(pos!==targetPos){
+      const next=pos+dir;
+      if(next<0||next>=result.length) break;
+      if(Math.abs(pct(result[pos])-pct(result[next]))>0.0001) break; // can't pass unequal team
+      [result[pos],result[next]]=[result[next],result[pos]];
+      pos=next;
+    }
+  });
+  return result;
+}
+
+function moveTeamInStandings(key, tid, dir){
+  // dir: -1 = up, 1 = down
+  if(!state.standingsOverrides) state.standingsOverrides={};
+  // Get current sorted list for this context
+  const rec=computeStandings();
+  let ids;
+  if(key.startsWith('conf_')){
+    const conf=parseInt(key.replace('conf_',''));
+    ids=TEAMS.filter(t=>t.conf===conf&&!t._ph).map(t=>t.id);
+  } else if(key.startsWith('cls_')){
+    const cls=key.replace('cls_','');
+    ids=TEAMS.filter(t=>t.cls===cls&&!t._ph).map(t=>t.id);
+  } else return;
+
+  const current=sortWithOverrides(ids,rec,key);
+  const pos=current.indexOf(tid);
+  if(pos<0) return;
+  const newPos=pos+dir;
+  if(newPos<0||newPos>=current.length) return;
+
+  // Only allow swap if teams have identical win%
+  const pct=(id)=>{const r=rec[id];if(!r)return -1;const g=r.w+r.l+r.t;return g>0?r.w/g:0;};
+  if(Math.abs(pct(tid)-pct(current[newPos]))>0.0001){
+    showToast('Can only reorder teams with identical records','tw');
+    return;
+  }
+
+  // Swap
+  const newOrder=[...current];
+  [newOrder[pos],newOrder[newPos]]=[newOrder[newPos],newOrder[pos]];
+  state.standingsOverrides[key]=newOrder;
+
+  // Save and re-render
+  if(window._fbDB){
+    window._fbDB.ref('ncgl2026/standingsOverrides').set(state.standingsOverrides).catch(()=>saveState());
+  } else saveState();
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+  renderConfStandings();
+  renderClassStandings();
+  showToast('✓ Standings order updated');
+}
+
+function clearStandingsOverride(key){
+  if(!state.standingsOverrides) return;
+  delete state.standingsOverrides[key];
+  if(window._fbDB){
+    window._fbDB.ref('ncgl2026/standingsOverrides').set(state.standingsOverrides).catch(()=>saveState());
+  } else saveState();
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+  renderConfStandings();
+  renderClassStandings();
+  showToast('✓ Override cleared — auto-sort restored');
+}
+
 function renderConfStandings(){
   const rec=computeStandings();
   const confs=[...new Set(TEAMS.map(t=>t.conf))].sort();
@@ -1812,24 +2006,39 @@ function renderConfStandings(){
   el.innerHTML='';
   confs.forEach(conf=>{
     const ct=TEAMS.filter(t=>t.conf===conf&&!t._ph);
-    const sorted=sortTeams(ct.map(t=>t.id),rec);
-    const isAll=conf<=2,isC3=conf===3,isChamp=conf>=4;
+    const key=`conf_${conf}`;
+    const sorted=sortWithOverrides(ct.map(t=>t.id),rec,key);
+    const hasOverride=state.standingsOverrides&&state.standingsOverrides[key]&&state.standingsOverrides[key].length>0;
+    const confRules=state.confRules||{};
+    const rule=confRules[conf]||confRules[String(conf)]||'fillSpots';
+    const ruleLabel=rule==='allQualify'?'✦ All qualify':rule==='fillSpots'?'◈ Fills brackets':rule==='playIn'?'⭐ Conf Champ Qualifies':'';
     const col=cColor(conf),cc=cClass(conf);
     const div=document.createElement('div');div.className='cblk';
     div.innerHTML=`
       <div class="chdr" style="background:${col}18;border-bottom:2px solid ${col}">
         <span class="cb ${cc}">Conf ${conf}</span>
         Conference ${conf}
-        <span style="margin-left:auto;font-size:9px;color:var(--gray)">${isAll?'✦ All qualify':isC3?'◈ Fills brackets':isChamp?'⭐ Conf Champ Qualifies':''}</span>
+        <span style="margin-left:auto;font-size:9px;color:var(--gray)">${ruleLabel}</span>
+        ${isAdmin&&hasOverride?`<button onclick="clearStandingsOverride('${key}')" style="font-size:10px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#f87171;border-radius:4px;padding:1px 6px;cursor:pointer;margin-left:6px" title="Clear manual override">↺ Auto</button>`:''}
       </div>
-      <table class="stbl"><thead><tr><th>Team</th><th>Cls</th><th>W</th><th>L</th><th>T</th><th>%</th><th>GF</th><th>GA</th></tr></thead><tbody>
+      <table class="stbl"><thead><tr><th>Team</th><th>Cls</th><th>W</th><th>L</th><th>T</th><th>%</th><th>GF</th><th>GA</th>${isAdmin?'<th></th>':''}</tr></thead><tbody>
       ${sorted.map((tid,idx)=>{
         const r=rec[tid],t=TM[tid];if(!r||!t)return'';
-        const rc=isAll?'qr':isChamp&&idx===0?'cr':'';
+        const rule2=confRules[conf]||confRules[String(conf)]||'fillSpots';
+        const rc=rule2==='allQualify'?'qr':rule2==='playIn'&&idx===0?'cr':'';
+        const pct=(id)=>{const rv=rec[id];if(!rv)return -1;const g=rv.w+rv.l+rv.t;return g>0?rv.w/g:0;};
+        const canUp=idx>0&&Math.abs(pct(tid)-pct(sorted[idx-1]))<0.0001;
+        const canDn=idx<sorted.length-1&&Math.abs(pct(tid)-pct(sorted[idx+1]))<0.0001;
+        const adminBtns=isAdmin?`<td style="white-space:nowrap">
+          <button onclick="moveTeamInStandings('${key}','${tid}',-1)" ${canUp?'':'disabled'} title="Move up"
+            style="padding:1px 5px;font-size:11px;border-radius:3px;background:${canUp?'rgba(16,185,129,.2)':'rgba(255,255,255,.05)'};border:1px solid ${canUp?'var(--green)':'var(--border)'};color:${canUp?'var(--green)':'var(--gray)'};cursor:${canUp?'pointer':'default'}">↑</button>
+          <button onclick="moveTeamInStandings('${key}','${tid}',1)" ${canDn?'':'disabled'} title="Move down"
+            style="padding:1px 5px;font-size:11px;border-radius:3px;background:${canDn?'rgba(239,68,68,.2)':'rgba(255,255,255,.05)'};border:1px solid ${canDn?'rgba(239,68,68,.5)':'var(--border)'};color:${canDn?'#f87171':'var(--gray)'};cursor:${canDn?'pointer':'default'}">↓</button>
+        </td>`:'';
         return`<tr class="${rc}"><td><span class="rnk">${idx+1}</span><span class="team-link" onclick="openTeamProfile('${tid}')">${t.name}</span></td>
           <td><span class="cb cl${t.cls}">${t.cls}</span></td>
           <td class="wc">${r.w}</td><td class="lc">${r.l}</td><td>${r.t}</td><td class="pct">${pctStr(r)}</td>
-          <td style="color:#38bdf8;font-weight:600">${r.gf||0}</td><td style="color:#fb923c;font-weight:600">${r.ga||0}</td></tr>`;
+          <td style="color:#38bdf8;font-weight:600">${r.gf||0}</td><td style="color:#fb923c;font-weight:600">${r.ga||0}</td>${adminBtns}</tr>`;
       }).join('')}
       </tbody></table>`;
     el.appendChild(div);
@@ -1856,39 +2065,50 @@ function renderClassStandings(){
   }
 
   ['A','B','C','D'].forEach(cls=>{
-    const blocks=confs.map(c=>({conf:c,ids:sortTeams(TEAMS.filter(t=>t.cls===cls&&t.conf===c&&!t._ph).map(t=>t.id),rec)}));
+    const key=`cls_${cls}`;
+    const blocks=confs.map(c=>({conf:c,ids:sortWithOverrides(TEAMS.filter(t=>t.cls===cls&&t.conf===c&&!t._ph).map(t=>t.id),rec,`conf_${c}`)}));
     const spots=PLAYOFF_SPOTS[cls];
+    const rules=state.confRules||{};
     const seeded=[];
     blocks.forEach(({conf,ids})=>{
-      if(conf<=2)ids.forEach(id=>seeded.push({id,conf}));
-      else if(conf===3)ids.forEach(id=>seeded.push({id,conf}));
+      const rule=rules[conf]||rules[String(conf)]||'fillSpots';
+      if(rule==='allQualify'||rule==='fillSpots') ids.forEach(id=>seeded.push({id,conf}));
     });
     const seededCapped=seeded.slice(0,spots);
-    // All teams in class ordered by conf block — conf 4 cannot jump conf 3
     const allIds=[];blocks.forEach(({ids})=>ids.forEach(id=>allIds.push(id)));
     if(!allIds.length)return;
+    const hasOverride=state.standingsOverrides&&state.standingsOverrides[key]&&state.standingsOverrides[key].length>0;
     const div=document.createElement('div');div.className='clsblk';
     div.innerHTML=`
-      <div class="clshdr h${cls}">Class ${cls} — Top ${spots} Qualify</div>
-      <table class="stbl"><thead><tr><th>Seed</th><th>Team</th><th>Conf</th><th>W</th><th>L</th><th>%</th></tr></thead><tbody>
+      <div class="clshdr h${cls}" style="display:flex;align-items:center;gap:8px">
+        <span>Class ${cls} — Top ${spots} Qualify</span>
+        ${isAdmin&&hasOverride?`<button onclick="clearStandingsOverride('${key}')" style="font-size:10px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#f87171;border-radius:4px;padding:1px 6px;cursor:pointer;margin-left:auto" title="Clear manual override">↺ Auto</button>`:''}
+      </div>
+      <table class="stbl"><thead><tr><th>Seed</th><th>Team</th><th>Conf</th><th>W</th><th>L</th><th>%</th>${isAdmin?'<th></th>':''}</tr></thead><tbody>
       ${allIds.map((tid,idx)=>{
         const r=rec[tid],t=TM[tid];if(!r||!t)return'';
         const si=seededCapped.findIndex(s=>s.id===tid);
         const isSeed=si>=0;
         const seed=si+1;
-        // Star on any team that qualifies from conf4 (handles multi-class ties)
         const isConf4Champ=!!conf4Qualifiers[tid];
         const sc=t.conf===1?'':` s${t.conf<=6?t.conf:1}`;
-        const seedCell=isSeed
-          ?`<span class="sn${sc}">${seed}</span>`
-          :`<span style="color:var(--gray);font-size:11px">${idx+1}</span>`;
+        const seedCell=isSeed?`<span class="sn${sc}">${seed}</span>`:`<span style="color:var(--gray);font-size:11px">${idx+1}</span>`;
+        const pct2=(id)=>{const rv=rec[id];if(!rv)return -1;const g=rv.w+rv.l+rv.t;return g>0?rv.w/g:0;};
+        const canUp=idx>0&&Math.abs(pct2(tid)-pct2(allIds[idx-1]))<0.0001;
+        const canDn=idx<allIds.length-1&&Math.abs(pct2(tid)-pct2(allIds[idx+1]))<0.0001;
+        const adminBtns=isAdmin?`<td style="white-space:nowrap">
+          <button onclick="moveTeamInStandings('${key}','${tid}',-1)" ${canUp?'':'disabled'} title="Move up"
+            style="padding:1px 5px;font-size:11px;border-radius:3px;background:${canUp?'rgba(16,185,129,.2)':'rgba(255,255,255,.05)'};border:1px solid ${canUp?'var(--green)':'var(--border)'};color:${canUp?'var(--green)':'var(--gray)'};cursor:${canUp?'pointer':'default'}">↑</button>
+          <button onclick="moveTeamInStandings('${key}','${tid}',1)" ${canDn?'':'disabled'} title="Move down"
+            style="padding:1px 5px;font-size:11px;border-radius:3px;background:${canDn?'rgba(239,68,68,.2)':'rgba(255,255,255,.05)'};border:1px solid ${canDn?'rgba(239,68,68,.5)':'var(--border)'};color:${canDn?'#f87171':'var(--gray)'};cursor:${canDn?'pointer':'default'}">↓</button>
+        </td>`:'';
         return`<tr ${isSeed?'class="qr"':''}>
           <td>${seedCell}</td>
           <td style="font-size:11px;font-weight:600">
             <span class="team-link" onclick="openTeamProfile('${tid}')">${t.name}</span>${isConf4Champ?` <span title="Conference 4 Champion — qualifies for playoffs" style="color:var(--gold);font-size:13px">⭐</span>`:''}
           </td>
           <td><span class="cb ${cClass(t.conf)}">C${t.conf}</span></td>
-          <td class="wc">${r.w}</td><td class="lc">${r.l}</td><td class="pct">${pctStr(r)}</td>
+          <td class="wc">${r.w}</td><td class="lc">${r.l}</td><td class="pct">${pctStr(r)}</td>${adminBtns}
         </tr>`;
       }).join('')}
       </tbody></table>`;
@@ -3677,6 +3897,7 @@ if(isFirebaseConfigured){
         }
         if(data.playoffSpots){state.playoffSpots=data.playoffSpots;PLAYOFF_SPOTS=state.playoffSpots;}
         if(data.confRules){state.confRules=data.confRules;}
+        if(data.standingsOverrides){state.standingsOverrides=data.standingsOverrides;}
         if(data.brackets){
           if(Date.now()-_bracketSaveTime < 3000){
             // Within save protection window — restore matchResults and slots always,
