@@ -610,6 +610,31 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
 
 </div><!-- end .main -->
 <div class="toast" id="toast"></div>
+<!-- PLAYOFF SCORE MODAL -->
+<div class="overlay hidden" id="po-score-ov">
+  <div class="modal" style="max-width:400px">
+    <button class="mcl" onclick="closePoScoreModal()">&#x2715;</button>
+    <h2 id="po-score-title">Playoff Score</h2>
+    <div id="po-score-round" style="font-size:11px;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px"></div>
+    <div class="fr" style="gap:14px">
+      <div class="fg" style="text-align:center">
+        <label id="po-top-lbl" style="font-size:13px;font-weight:700;color:var(--text);text-transform:none;letter-spacing:0;display:block;margin-bottom:4px">Team A</label>
+        <input type="number" id="po-top-score" min="0" max="99" value="0"
+          style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:36px;text-align:center;color:var(--gold);background:var(--navy2);border:2px solid var(--border);border-radius:10px;padding:10px 4px">
+      </div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:28px;color:var(--gray);padding-top:32px;flex-shrink:0">&#8211;</div>
+      <div class="fg" style="text-align:center">
+        <label id="po-bot-lbl" style="font-size:13px;font-weight:700;color:var(--text);text-transform:none;letter-spacing:0;display:block;margin-bottom:4px">Team B</label>
+        <input type="number" id="po-bot-score" min="0" max="99" value="0"
+          style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:36px;text-align:center;color:var(--gold);background:var(--navy2);border:2px solid var(--border);border-radius:10px;padding:10px 4px">
+      </div>
+    </div>
+    <div id="po-score-err" style="color:var(--red);font-size:12px;margin-top:6px;display:none;text-align:center"></div>
+    <button class="btn btn-p" onclick="savePoScore()" style="margin-top:14px;font-size:15px;padding:11px">&#10003; Save &amp; Advance Winner</button>
+    <button class="btn btn-d" onclick="clearPoScore()" id="po-clear-btn" style="margin-top:8px;display:none">&#128465; Clear This Result</button>
+    <p style="font-size:10px;color:var(--text-dim);margin-top:10px;text-align:center">Winner advances automatically. Scores cannot be tied.</p>
+  </div>
+</div>
 
 <script>var _bracketSaveTime=0;
 var _suppressConfRerender=false;
@@ -2364,7 +2389,6 @@ function renderResults(){
 function initBrackets(){
   if(!state.brackets) state.brackets=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG));
   ['A','B','C','D'].forEach(cls=>{
-    // FIX: save visible before any default can overwrite it (DEFAULT_BRACKET_CONFIG has visible:false)
     const _savedVisible = state.brackets[cls] ? state.brackets[cls].visible : undefined;
     if(!state.brackets[cls]) state.brackets[cls]=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG[cls]));
     if(!state.brackets[cls].rounds) state.brackets[cls].rounds=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG[cls].rounds));
@@ -2374,7 +2398,6 @@ function initBrackets(){
     if(DEFAULT_BRACKET_CONFIG[cls].byeSeeds&&!state.brackets[cls].byeSeeds){
       state.brackets[cls].byeSeeds=DEFAULT_BRACKET_CONFIG[cls].byeSeeds;
     }
-    // FIX: restore visible — never let DEFAULT_BRACKET_CONFIG (visible:false) overwrite it
     if(_savedVisible !== undefined) state.brackets[cls].visible = _savedVisible;
     // Force-correct known wrong dates that may be cached in Firebase
     // This runs on every load and pushes corrections back to Firebase automatically
@@ -2551,6 +2574,88 @@ function autoFillBracket(cls){
   }
   cfg.matchResults={};
   saveState();
+}
+
+function getGameDateVenue(cfg,key,ri){
+  const st=(cfg.matchResults&&cfg.matchResults[key])||{};
+  const rounds=cfg.rounds||[];
+  const roundInfo=rounds[ri]||{};
+  return{
+    date: st.dateOverride!==undefined ? st.dateOverride : (roundInfo.date||''),
+    venue: st.venueOverride!==undefined ? st.venueOverride : (roundInfo.venue||''),
+    hasOverride: st.dateOverride!==undefined || st.venueOverride!==undefined
+  };
+}
+
+function editGameDate(cls,key,ri){
+  if(!isAdmin)return;
+  initBrackets();
+  const cfg=state.brackets[cls];
+  if(!cfg.matchResults) cfg.matchResults={};
+  if(!cfg.matchResults[key]) cfg.matchResults[key]={};
+  const st=cfg.matchResults[key];
+  const rounds=cfg.rounds||DEFAULT_BRACKET_CONFIG[cls].rounds;
+  const roundDefault=rounds[ri]||{};
+  const currentDate=st.dateOverride!==undefined?st.dateOverride:(roundDefault.date||'');
+  const currentVenue=st.venueOverride!==undefined?st.venueOverride:(roundDefault.venue||'');
+  const newDate=prompt('Game date (clear to revert to round default):',currentDate);
+  if(newDate===null)return;
+  const newVenue=prompt('Game venue (clear to revert to round default):',currentVenue);
+  if(newVenue===null)return;
+  if(newDate.trim()===''){delete st.dateOverride;}else{st.dateOverride=newDate.trim();}
+  if(newVenue.trim()===''){delete st.venueOverride;}else{st.venueOverride=newVenue.trim();}
+  _bracketSaveTime=Date.now();
+  if(window._fbDB){
+    window._fbDB.ref('ncgl2026/brackets/'+cls+'/matchResults').set(cfg.matchResults)
+      .then(()=>showToast('✓ Game date/venue saved'))
+      .catch(()=>{saveState();showToast('✓ Game date/venue updated');});
+  } else { saveState(); showToast('✓ Game date/venue updated'); }
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+  renderBracketAdminControls();
+  renderPlayoffsTab();
+}
+
+function renderGameDateOverrides(cls,cfg){
+  if(!cfg.slots||!cfg.slots.length) return '';
+  const byeSeeds2=cfg.byeSeeds||(DEFAULT_BRACKET_CONFIG[cls]&&DEFAULT_BRACKET_CONFIG[cls].byeSeeds)||0;
+  const rounds2=cfg.rounds||DEFAULT_BRACKET_CONFIG[cls].rounds;
+  const matchKeys=[];
+  if(byeSeeds2>0){
+    matchKeys.push({key:'r0m0',ri:0,label:'First Round: #8 vs #9'});
+    matchKeys.push({key:'r0m1',ri:0,label:'First Round: #7 vs #10'});
+    matchKeys.push({key:'r1m0',ri:1,label:'QF: #1 vs FR Winner'});
+    matchKeys.push({key:'r1m1',ri:1,label:'QF: #4 vs #5'});
+    matchKeys.push({key:'r1m2',ri:1,label:'QF: #3 vs #6'});
+    matchKeys.push({key:'r1m3',ri:1,label:'QF: #2 vs FR Winner'});
+    matchKeys.push({key:'r2m0',ri:2,label:'Semifinal 1'});
+    matchKeys.push({key:'r2m1',ri:2,label:'Semifinal 2'});
+    matchKeys.push({key:'r3m0',ri:3,label:'Final'});
+  } else {
+    const size2=cfg.size||(PLAYOFF_SPOTS[cls]||8);
+    const order2=size2===8?[[0,7],[3,4],[2,5],[1,6]]:size2===4?[[0,3],[1,2]]:[];
+    order2.forEach(function(pair,mi){matchKeys.push({key:'r0m'+mi,ri:0,label:'R1: Seed #'+(pair[0]+1)+' vs #'+(pair[1]+1)});});
+    const nr2=size2<=4?2:size2<=8?3:4;
+    for(let r2=1;r2<nr2;r2++){
+      const cnt2=Math.ceil(order2.length/Math.pow(2,r2));
+      for(let m2=0;m2<cnt2;m2++) matchKeys.push({key:'r'+r2+'m'+m2,ri:r2,label:(rounds2[r2]&&rounds2[r2].name||'Round '+(r2+1))+' Game '+(m2+1)});
+    }
+  }
+  let out='<div style="margin-top:12px;margin-bottom:4px">'
+    +'<div style="font-size:11px;color:var(--gray);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;font-weight:700">Per-Game Date/Venue Overrides</div>'
+    +'<div style="font-size:10px;color:var(--text-dim);margin-bottom:7px">Set a custom date or venue for any individual game. Gold = override active. Clear to revert to round default.</div>';
+  matchKeys.forEach(function(mk){
+    const gdv=getGameDateVenue(cfg,mk.key,mk.ri);
+    const overrideHtml=gdv.hasOverride
+      ?('<span style="color:var(--gold);font-size:10px">'+gdv.date+(gdv.venue?' · '+gdv.venue:'')+'</span>')
+      :'<span style="color:var(--border);font-size:10px">round default</span>';
+    out+='<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--navy);border-radius:6px;margin-bottom:3px;font-size:11px">'
+      +'<span style="flex:1;color:var(--text-dim)">'+mk.label+'</span>'
+      +overrideHtml
+      +'<button data-cls="'+cls+'" data-key="'+mk.key+'" data-ri="'+mk.ri+'" onclick="editGameDate(this.dataset.cls,this.dataset.key,parseInt(this.dataset.ri))" style="background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-size:10px;color:var(--gray);padding:1px 6px">&#128197; Edit</button>'
+      +'</div>';
+  });
+  out+='</div>';
+  return out;
 }
 
 function renderBracket(cls){
@@ -2781,6 +2886,7 @@ function renderBracket(cls){
       <div class="bracket-round-title">${rInfo.name}<small>${rInfo.date||''}</small><small style="color:var(--blue-lt)">${rInfo.venue||''}</small></div>`;
     rnd.forEach((pair,mi)=>{
       const key=`r${ri}m${mi}`;
+      const gdv=getGameDateVenue(cfg,key,ri);
       html+=`<div class="bracket-match${isFinal?' final':''}">`;
       pair.forEach((sl)=>{
         const wc=sl.winner?'winner':'';
@@ -2798,6 +2904,7 @@ function renderBracket(cls){
         </div>`;
       });
       html+=`</div>`;
+      if(gdv.date||gdv.venue){const dc=gdv.hasOverride?'var(--gold)':'var(--text-dim)';html+=`<div style="font-size:10px;text-align:center;padding:1px 6px 5px;line-height:1.5"><span style="color:${dc}">${gdv.date}</span>${gdv.date&&gdv.venue?`<span style="color:var(--border)"> · </span>`:``}${gdv.venue?`<span style="color:var(--blue-lt)">${gdv.venue}</span>`:``}</div>`;}
     });
     html+=`</div>`;
     if(ri<numRounds-1) html+=`<div style="display:flex;align-items:center;width:14px;flex-shrink:0"></div>`;
@@ -3281,6 +3388,7 @@ function renderBracketAdminControls(){
         </div>`).join('')}
       </div>
       <div class="brc-actions"></div>
+      ${renderGameDateOverrides(cls,cfg)}
       ${cfg.slots&&cfg.slots.length?`<div style="margin-top:12px">
         <div style="font-size:11px;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:700">Seeds (click to edit name)</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:5px">
@@ -3307,19 +3415,13 @@ function toggleBracketVisible(cls,val){
   initBrackets();
   state.brackets[cls].visible=val;
   _bracketSaveTime=Date.now();
-  // FIX: write ONLY the visible flag directly to Firebase instead of saveState().
-  // saveState() does a full write that races with the listener and reverts the toggle.
   if(window._fbDB){
     window._fbDB.ref('ncgl2026/brackets/'+cls+'/visible').set(val)
       .then(()=>showToast('Class '+cls+' bracket '+(val?'is now PUBLIC ✓':'set to Private'),(val?'':'tw')))
-      .catch(e=>{ console.error('visible save error:',e); saveState(); showToast('Class '+cls+' bracket '+(val?'is now PUBLIC ✓':'set to Private'),(val?'':'tw')); });
-  } else {
-    saveState();
-    showToast('Class '+cls+' bracket '+(val?'is now PUBLIC ✓':'set to Private'),(val?'':'tw'));
-  }
+      .catch(e=>{ saveState(); showToast('Class '+cls+' bracket '+(val?'is now PUBLIC ✓':'set to Private'),(val?'':'tw')); });
+  } else { saveState(); showToast('Class '+cls+' bracket '+(val?'is now PUBLIC ✓':'set to Private'),(val?'':'tw')); }
   try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
-  renderBracketAdminControls();
-  renderPlayoffsTab();
+  renderBracketAdminControls(); renderPlayoffsTab();
 }
 
 // Bracket save — handled via editRoundInfo() prompt modal
@@ -3404,35 +3506,25 @@ function clearMatchCascade(cls, ri, mi){
   }
 }
 
-function openMatchEdit(cls,key,ri,mi){
-  if(!isAdmin)return;initBrackets();
+let _poModal={cls:null,key:null,ri:null,mi:null,topName:null,botName:null};
+
+function resolveMatchTeams(cls,key,ri,mi){
+  initBrackets();
   const cfg=state.brackets[cls];
-  if(!cfg.matchResults) cfg.matchResults={};
-  const st=cfg.matchResults[key]||{};
+  const st=(cfg.matchResults&&cfg.matchResults[key])||{};
   const slots=cfg.slots||[];
   const byeSeeds=cfg.byeSeeds||(DEFAULT_BRACKET_CONFIG[cls]&&DEFAULT_BRACKET_CONFIG[cls].byeSeeds)||0;
-
-  // Resolve team names: prefer stored names (from previous advance), fall back to seeding
   let topName=st.top||'TBD';
   let botName=st.bot||'TBD';
-
-  // If no stored names yet, derive from context
   if(!st.top||!st.bot){
     if(byeSeeds>0){
-      // Class B custom layout
-      const ft=slots.slice(byeSeeds); // [seed7,seed8,seed9,seed10]
+      const ft=slots.slice(byeSeeds);
       if(ri===0){
-        // First round: r0m0=8v9, r0m1=7v10
-        const pairs=[
-          [ft[1]?.team||'TBD', ft[2]?.team||'TBD'], // 8v9
-          [ft[0]?.team||'TBD', ft[3]?.team||'TBD'], // 7v10
-        ];
+        const pairs=[[ft[1]?.team||'TBD',ft[2]?.team||'TBD'],[ft[0]?.team||'TBD',ft[3]?.team||'TBD']];
         if(!st.top) topName=pairs[mi]?.[0]||'TBD';
         if(!st.bot) botName=pairs[mi]?.[1]||'TBD';
       } else if(ri===1){
-        // QF: [#1 vs FR0-winner, #4 vs #5, #3 vs #6, #2 vs FR1-winner]
         const qfTops=[slots[0]?.team,slots[3]?.team,slots[2]?.team,slots[1]?.team];
-        const qfBots=['fr0','TBD','TBD','fr1'];
         if(!st.top) topName=qfTops[mi]||'TBD';
         if(!st.bot){
           if(mi===0){const fr=cfg.matchResults['r0m0']||{};botName=fr.winner==='top'?fr.top:fr.winner==='bot'?fr.bot:'FR Winner';}
@@ -3440,133 +3532,110 @@ function openMatchEdit(cls,key,ri,mi){
           else botName=[slots[4]?.team,null,slots[5]?.team,null][mi]||'TBD';
         }
       } else {
-        // SF / Finals: use previous round winners
-        const prevKey=`r${ri-1}m${mi*2}`;
-        const prevKey2=`r${ri-1}m${mi*2+1}`;
-        const p1=cfg.matchResults[prevKey]||{};
-        const p2=cfg.matchResults[prevKey2]||{};
+        const p1=cfg.matchResults[`r${ri-1}m${mi*2}`]||{};
+        const p2=cfg.matchResults[`r${ri-1}m${mi*2+1}`]||{};
         if(!st.top) topName=p1.winner==='top'?p1.top:p1.winner==='bot'?p1.bot:'TBD';
         if(!st.bot) botName=p2.winner==='top'?p2.top:p2.winner==='bot'?p2.bot:'TBD';
       }
     } else {
-      // Standard bracket
       if(ri===0){
-        // First round — read from slots using correct ordering
         const size=slots.length;
         let order=[];
         if(size===8) order=[[0,7],[3,4],[2,5],[1,6]];
         else if(size===4) order=[[0,3],[1,2]];
-        else{ const h=Math.ceil(size/2); for(let i=0;i<h;i++) order.push([i,size-1-i]); }
+        else{const h=Math.ceil(size/2);for(let i=0;i<h;i++) order.push([i,size-1-i]);}
         const pair=order[mi]||[mi,size-1-mi];
         if(!st.top) topName=slots[pair[0]]?.team||'TBD';
         if(!st.bot) botName=slots[pair[1]]?.team||'TBD';
       } else {
-        // Later rounds — use previous round stored results
-        const pk1=`r${ri-1}m${mi*2}`;
-        const pk2=`r${ri-1}m${mi*2+1}`;
-        const p1=cfg.matchResults[pk1]||{};
-        const p2=cfg.matchResults[pk2]||{};
+        const p1=cfg.matchResults[`r${ri-1}m${mi*2}`]||{};
+        const p2=cfg.matchResults[`r${ri-1}m${mi*2+1}`]||{};
         if(!st.top) topName=p1.winner==='top'?p1.top:p1.winner==='bot'?p1.bot:'TBD';
         if(!st.bot) botName=p2.winner==='top'?p2.top:p2.winner==='bot'?p2.bot:'TBD';
       }
     }
   }
+  return{topName,botName,st};
+}
 
-  // If result already exists, offer option to clear it first
+function openMatchEdit(cls,key,ri,mi){
+  if(!isAdmin)return;
+  initBrackets();
+  const cfg=state.brackets[cls];
+  if(!cfg.matchResults) cfg.matchResults={};
+  const {topName,botName,st}=resolveMatchTeams(cls,key,ri,mi);
+  const rounds=cfg.rounds||DEFAULT_BRACKET_CONFIG[cls].rounds;
+  const roundInfo=rounds[ri]||{};
+  _poModal={cls,key,ri,mi,topName,botName};
+  const clsLabel={A:'Class A',B:'Class B',C:'Class C',D:'Class D'}[cls]||'Class '+cls;
+  document.getElementById('po-score-title').textContent='🥍 '+clsLabel+' Playoffs';
+  document.getElementById('po-score-round').textContent=(roundInfo.name||'Round '+(ri+1))+(roundInfo.date?' · '+roundInfo.date:'');
+  document.getElementById('po-top-lbl').textContent=topName;
+  document.getElementById('po-bot-lbl').textContent=botName;
+  document.getElementById('po-score-err').style.display='none';
   const hasResult=st.topScore!=null&&st.botScore!=null;
-  if(hasResult){
-    const action=prompt(
-      `${topName} ${st.topScore}–${st.botScore} ${botName}\n\nEnter new scores to update, or type CLEAR to remove this result and retract the bracket:`,
-      ''
-    );
-    if(action===null)return;
-    if(action.trim().toUpperCase()==='CLEAR'){
-      // Remove this result and cascade-clear downstream
-      delete cfg.matchResults[key];
-      clearMatchCascade(cls,ri,mi);
-      _bracketSaveTime=Date.now();
-      if(window._fbDB){window._fbDB.ref(`ncgl2026/brackets/${cls}/matchResults`).set(cfg.matchResults).catch(e=>saveState());}else{saveState();}
-      try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
-      renderPlayoffsTab();
-      if(isAdmin&&document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')) renderBracketAdminControls();
-      showToast(`✓ Result cleared — bracket retracted`,'tw');
-      return;
-    }
-    // Otherwise treat their input as the top score
-    const bs=prompt(`${botName} score:`,st.botScore??'');
-    if(bs===null)return;
-    const tsv=action.trim()===''?null:parseInt(action);
-    const bsv=bs.trim()===''?null:parseInt(bs);
-    if(tsv!=null&&isNaN(tsv)){showToast('Invalid score — enter a number','tw');return;}
-    if(bsv!=null&&isNaN(bsv)){showToast('Invalid score — enter a number','tw');return;}
-    const winner=(tsv!=null&&bsv!=null)?(tsv>bsv?'top':'bot'):null;
-    const oldWinner=st.winner==='top'?st.top:st.bot;
-    const newWinner=winner==='top'?topName:botName;
-    // If winner changed, cascade-clear downstream before re-advancing
-    if(winner&&oldWinner&&newWinner!==oldWinner){
-      clearMatchCascade(cls,ri,mi);
-    }
-    cfg.matchResults[key]={top:topName,bot:botName,topScore:tsv,botScore:bsv,winner};
-    if(winner){
-      const wName=newWinner;
-      const nk=`r${ri+1}m${Math.floor(mi/2)}`;
-      const slot=mi%2===0?'top':'bot';
-      if(!cfg.matchResults[nk]) cfg.matchResults[nk]={};
-      const nextSt=cfg.matchResults[nk];
-      if(!nextSt.topScore&&!nextSt.botScore) nextSt[slot]=wName;
-    }
-    _bracketSaveTime=Date.now();
-    if(window._fbDB){window._fbDB.ref(`ncgl2026/brackets/${cls}/matchResults`).set(cfg.matchResults).catch(e=>saveState());}else{saveState();}
-    try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
-    renderPlayoffsTab();
-    if(isAdmin&&document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')) renderBracketAdminControls();
-    showToast(`✓ ${topName} ${tsv??'—'}–${bsv??'—'} ${botName}`);
-    return;
-  }
+  document.getElementById('po-top-score').value=hasResult?st.topScore:0;
+  document.getElementById('po-bot-score').value=hasResult?st.botScore:0;
+  document.getElementById('po-clear-btn').style.display=hasResult?'':'none';
+  document.getElementById('po-score-ov').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('po-top-score').focus(),80);
+}
 
-  // No existing result — enter fresh scores
-  const ts=prompt(`${topName} score (leave blank = not played yet):`,st.topScore??'');
-  if(ts===null)return;
-  const bs=prompt(`${botName} score:`,st.botScore??'');
-  if(bs===null)return;
-  const tsv=ts.trim()===''?null:parseInt(ts);
-  const bsv=bs.trim()===''?null:parseInt(bs);
-  if(tsv!=null&&isNaN(tsv)){showToast('Invalid score — enter a number','tw');return;}
-  if(bsv!=null&&isNaN(bsv)){showToast('Invalid score — enter a number','tw');return;}
-  const winner=(tsv!=null&&bsv!=null)?(tsv>bsv?'top':'bot'):null;
+function closePoScoreModal(){
+  document.getElementById('po-score-ov').classList.add('hidden');
+  _poModal={cls:null,key:null,ri:null,mi:null,topName:null,botName:null};
+}
 
-  // Store this match result with team names so later rounds can reference them
+function savePoScore(){
+  const {cls,key,ri,mi,topName,botName}=_poModal;
+  if(!cls)return;
+  const tsv=parseInt(document.getElementById('po-top-score').value);
+  const bsv=parseInt(document.getElementById('po-bot-score').value);
+  const err=document.getElementById('po-score-err');
+  err.style.display='none';
+  if(isNaN(tsv)||isNaN(bsv)){err.textContent='Enter valid scores for both teams.';err.style.display='block';return;}
+  if(tsv===bsv){err.textContent='Scores cannot be tied in playoffs — one team must win.';err.style.display='block';return;}
+  if(tsv<0||bsv<0){err.textContent='Scores cannot be negative.';err.style.display='block';return;}
+  initBrackets();
+  const cfg=state.brackets[cls];
+  if(!cfg.matchResults) cfg.matchResults={};
+  const st=cfg.matchResults[key]||{};
+  const winner=tsv>bsv?'top':'bot';
+  const oldWinner=st.winner==='top'?st.top:st.bot;
+  const newWinner=winner==='top'?topName:botName;
+  if(st.topScore!=null&&oldWinner&&newWinner!==oldWinner) clearMatchCascade(cls,ri,mi);
   cfg.matchResults[key]={top:topName,bot:botName,topScore:tsv,botScore:bsv,winner};
-
-  // Auto-advance winner to next round
-  if(winner){
-    const wName=winner==='top'?topName:botName;
-    const nextRi=ri+1;
-    const nextMi=Math.floor(mi/2);
-    const slot=mi%2===0?'top':'bot';
-    const nk=`r${nextRi}m${nextMi}`;
-    if(!cfg.matchResults[nk]) cfg.matchResults[nk]={};
-    const nextSt=cfg.matchResults[nk];
-    if(!nextSt.topScore&&!nextSt.botScore){
-      nextSt[slot]=wName;
-    }
-  }
-
-  // Write matchResults directly to Firebase path — bypasses race condition completely
+  const nk=`r${ri+1}m${Math.floor(mi/2)}`;
+  const slot=mi%2===0?'top':'bot';
+  if(!cfg.matchResults[nk]) cfg.matchResults[nk]={};
+  if(!cfg.matchResults[nk].topScore&&!cfg.matchResults[nk].botScore) cfg.matchResults[nk][slot]=newWinner;
   _bracketSaveTime=Date.now();
   if(window._fbDB){
-    window._fbDB.ref(`ncgl2026/brackets/${cls}/matchResults`).set(cfg.matchResults)
-      .catch(e=>{ console.error('Score save error:',e); saveState(); });
-  } else {
-    saveState();
-  }
-  // Also update localStorage immediately
+    window._fbDB.ref(`ncgl2026/brackets/${cls}/matchResults`).set(cfg.matchResults).catch(e=>saveState());
+  } else { saveState(); }
   try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+  closePoScoreModal();
   renderPlayoffsTab();
-  if(isAdmin&&document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')){
-    renderBracketAdminControls();
-  }
-  showToast(`✓ ${topName} ${tsv??'—'}–${bsv??'—'} ${botName}`);
+  if(isAdmin&&document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')) renderBracketAdminControls();
+  showToast('✓ '+topName+' '+tsv+'–'+bsv+' '+botName+' — '+newWinner+' advances');
+}
+
+function clearPoScore(){
+  const {cls,key,ri,mi}=_poModal;
+  if(!cls||!confirm('Clear this result and retract the bracket from this point forward?'))return;
+  initBrackets();
+  const cfg=state.brackets[cls];
+  delete cfg.matchResults[key];
+  clearMatchCascade(cls,ri,mi);
+  _bracketSaveTime=Date.now();
+  if(window._fbDB){
+    window._fbDB.ref(`ncgl2026/brackets/${cls}/matchResults`).set(cfg.matchResults).catch(e=>saveState());
+  } else { saveState(); }
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+  closePoScoreModal();
+  renderPlayoffsTab();
+  if(isAdmin&&document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')) renderBracketAdminControls();
+  showToast('✓ Result cleared — bracket retracted','tw');
 }
 
 function openPlayinEdit(cls){
@@ -3848,6 +3917,9 @@ function closeTeamProfile(){
 document.getElementById('team-ov').addEventListener('click',e=>{
   if(e.target===document.getElementById('team-ov'))closeTeamProfile();
 });
+document.getElementById('po-score-ov').addEventListener('click',e=>{
+  if(e.target===document.getElementById('po-score-ov'))closePoScoreModal();
+});
 
 // ── FIREBASE CONFIG ───────────────────────────────────────────────────────
 // STEP: Paste your Firebase config values below.
@@ -3923,7 +3995,7 @@ if(isFirebaseConfigured){
                 if(data.brackets[cls].matchResults!==undefined) state.brackets[cls].matchResults=data.brackets[cls].matchResults||{};
                 if(data.brackets[cls].slots) state.brackets[cls].slots=data.brackets[cls].slots;
                 if(data.brackets[cls].playinMatch!==undefined) state.brackets[cls].playinMatch=data.brackets[cls].playinMatch;
-                // FIX: ALWAYS restore visible from Firebase as strict boolean
+                // Always restore visible as strict boolean from Firebase
                 if(data.brackets[cls].visible!==undefined) state.brackets[cls].visible=data.brackets[cls].visible===true;
               }
             });
