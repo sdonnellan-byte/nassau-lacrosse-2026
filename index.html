@@ -2364,6 +2364,8 @@ function renderResults(){
 function initBrackets(){
   if(!state.brackets) state.brackets=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG));
   ['A','B','C','D'].forEach(cls=>{
+    // FIX: save visible before any default can overwrite it (DEFAULT_BRACKET_CONFIG has visible:false)
+    const _savedVisible = state.brackets[cls] ? state.brackets[cls].visible : undefined;
     if(!state.brackets[cls]) state.brackets[cls]=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG[cls]));
     if(!state.brackets[cls].rounds) state.brackets[cls].rounds=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG[cls].rounds));
     if(!state.brackets[cls].matchResults) state.brackets[cls].matchResults={};
@@ -2372,6 +2374,8 @@ function initBrackets(){
     if(DEFAULT_BRACKET_CONFIG[cls].byeSeeds&&!state.brackets[cls].byeSeeds){
       state.brackets[cls].byeSeeds=DEFAULT_BRACKET_CONFIG[cls].byeSeeds;
     }
+    // FIX: restore visible — never let DEFAULT_BRACKET_CONFIG (visible:false) overwrite it
+    if(_savedVisible !== undefined) state.brackets[cls].visible = _savedVisible;
     // Force-correct known wrong dates that may be cached in Firebase
     // This runs on every load and pushes corrections back to Firebase automatically
     const DATE_CORRECTIONS={
@@ -3303,8 +3307,19 @@ function toggleBracketVisible(cls,val){
   initBrackets();
   state.brackets[cls].visible=val;
   _bracketSaveTime=Date.now();
-  saveState();renderBracketAdminControls();renderPlayoffsTab();
-  showToast(`Class ${cls} bracket ${val?'is now PUBLIC ✓':'set to Private'}`,(val?'':'tw'));
+  // FIX: write ONLY the visible flag directly to Firebase instead of saveState().
+  // saveState() does a full write that races with the listener and reverts the toggle.
+  if(window._fbDB){
+    window._fbDB.ref('ncgl2026/brackets/'+cls+'/visible').set(val)
+      .then(()=>showToast('Class '+cls+' bracket '+(val?'is now PUBLIC ✓':'set to Private'),(val?'':'tw')))
+      .catch(e=>{ console.error('visible save error:',e); saveState(); showToast('Class '+cls+' bracket '+(val?'is now PUBLIC ✓':'set to Private'),(val?'':'tw')); });
+  } else {
+    saveState();
+    showToast('Class '+cls+' bracket '+(val?'is now PUBLIC ✓':'set to Private'),(val?'':'tw'));
+  }
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+  renderBracketAdminControls();
+  renderPlayoffsTab();
 }
 
 // Bracket save — handled via editRoundInfo() prompt modal
@@ -3908,8 +3923,8 @@ if(isFirebaseConfigured){
                 if(data.brackets[cls].matchResults!==undefined) state.brackets[cls].matchResults=data.brackets[cls].matchResults||{};
                 if(data.brackets[cls].slots) state.brackets[cls].slots=data.brackets[cls].slots;
                 if(data.brackets[cls].playinMatch!==undefined) state.brackets[cls].playinMatch=data.brackets[cls].playinMatch;
-                // Also restore visible (toggle state)
-                if(data.brackets[cls].visible!==undefined) state.brackets[cls].visible=data.brackets[cls].visible;
+                // FIX: ALWAYS restore visible from Firebase as strict boolean
+                if(data.brackets[cls].visible!==undefined) state.brackets[cls].visible=data.brackets[cls].visible===true;
               }
             });
           } else {
