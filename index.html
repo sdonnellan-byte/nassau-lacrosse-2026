@@ -2534,8 +2534,13 @@ function _autoSyncBracket(cls){
       oppScore:existingPI.oppScore??null,
       winnerId:existingPI.winnerId||null
     };
-    // Mark last slot as TBA play-in winner
-    newSlots[size-1]={seed:size,team:'TBA — Play-In Winner',teamId:null,score:null,winner:false,isPlayinSlot:true};
+    // If play-in winner already decided, keep their name in the slot; otherwise TBA
+    if(existingPI.winnerId){
+      const resolvedWinner=existingPI.winnerId==='champ'?champ.name:(lastSeed?lastSeed.team:'TBD');
+      newSlots[size-1]={seed:size,team:resolvedWinner,teamId:null,score:null,winner:false,isPlayinSlot:false};
+    } else {
+      newSlots[size-1]={seed:size,team:'TBA — Play-In Winner',teamId:null,score:null,winner:false,isPlayinSlot:true};
+    }
   } else {
     cfg.playinMatch=null;
   }
@@ -3629,8 +3634,7 @@ function savePoScore(){
 }
 
 function savePlayinScore(){
-  // Save the play-in game score and advance the winner into the last bracket slot
-  const {cls,topName,botName}=_poModal;
+  const {cls}=_poModal;
   if(!cls)return;
   const tsv=parseInt(document.getElementById('po-top-score').value);
   const bsv=parseInt(document.getElementById('po-bot-score').value);
@@ -3639,58 +3643,74 @@ function savePlayinScore(){
   if(isNaN(tsv)||isNaN(bsv)){err.textContent='Enter valid scores for both teams.';err.style.display='block';return;}
   if(tsv===bsv){err.textContent='Scores cannot be tied — one team must win.';err.style.display='block';return;}
   if(tsv<0||bsv<0){err.textContent='Scores cannot be negative.';err.style.display='block';return;}
-  initBrackets();
-  const cfg=state.brackets[cls];
-  const pi=cfg.playinMatch;
-  if(!pi)return;
-  // champTeam is topName (listed first), oppTeam is botName
+
+  // Read current playinMatch BEFORE any initBrackets() call (which resets fields)
+  if(!state.brackets||!state.brackets[cls]||!state.brackets[cls].playinMatch){
+    err.textContent='Play-in data not found. Please reload and try again.';err.style.display='block';return;
+  }
+  const pi=state.brackets[cls].playinMatch;
+  const champTeam=pi.champTeam;
+  const oppTeam=pi.oppTeam;
+  const oppSeed=pi.oppSeed;
+
+  // Determine winner
+  const winnerIsChamp=tsv>bsv;
+  const winnerName=winnerIsChamp?champTeam:oppTeam;
+  const size=(state.brackets[cls].slots&&state.brackets[cls].slots.length)||8;
+
+  // Update playinMatch scores
   pi.champScore=tsv;
   pi.oppScore=bsv;
-  pi.winnerId=tsv>bsv?'champ':'opp';
-  const winnerName=pi.winnerId==='champ'?pi.champTeam:pi.oppTeam;
-  const loserName=pi.winnerId==='champ'?pi.oppTeam:pi.champTeam;
-  // Advance winner into the last bracket slot (the isPlayinSlot)
-  const size=cfg.slots&&cfg.slots.length;
-  if(size){
-    cfg.slots[size-1]={
-      seed:size,
-      team:winnerName,
-      teamId:null,
-      score:null,
-      winner:false,
-      isPlayinSlot:false  // now a real team, not TBA anymore
-    };
-  }
-  // Also seed the winner into the first-round matchResult that references the play-in slot.
-  // For standard brackets (Class C/D/A): the last seed plays the 1-seed in r0.
-  // The matchResult slot for the last seed position:
-  if(!cfg.matchResults) cfg.matchResults={};
+  pi.winnerId=winnerIsChamp?'champ':'opp';
+
+  // Advance winner into the last bracket slot
+  state.brackets[cls].slots[size-1]={
+    seed:size,
+    team:winnerName,
+    teamId:null,
+    score:null,
+    winner:false,
+    isPlayinSlot:false
+  };
+
+  // Seed winner into the first-round matchResult
+  if(!state.brackets[cls].matchResults) state.brackets[cls].matchResults={};
+  const matchResults=state.brackets[cls].matchResults;
   const order=size===8?[[0,7],[3,4],[2,5],[1,6]]:size===4?[[0,3],[1,2]]:[];
-  // Find which first-round match involves the last seed (size-1 index)
-  order.forEach(function([hi,lo],mi){
+  order.forEach(function(pair,mi){
+    const hi=pair[0],lo=pair[1];
     if(hi===size-1||lo===size-1){
       const key='r0m'+mi;
-      if(!cfg.matchResults[key]) cfg.matchResults[key]={};
-      const st=cfg.matchResults[key];
-      // Only set the team name slot, don't overwrite any existing score
+      if(!matchResults[key]) matchResults[key]={};
+      const st=matchResults[key];
       if(!st.topScore&&!st.botScore){
         if(hi===size-1) st.top=winnerName; else st.bot=winnerName;
       }
     }
   });
+
+  // Write directly to Firebase — do NOT call saveState() which triggers listener race
   _bracketSaveTime=Date.now();
-  if(window._fbDB){
-    window._fbDB.ref('ncgl2026/brackets/'+cls).update({
-      playinMatch: cfg.playinMatch,
-      slots: cfg.slots,
-      matchResults: cfg.matchResults
-    }).catch(e=>saveState());
-  } else { saveState(); }
+  const bracketData={
+    playinMatch: state.brackets[cls].playinMatch,
+    slots: state.brackets[cls].slots,
+    matchResults: state.brackets[cls].matchResults
+  };
+  // Also persist to localStorage immediately so reload shows the result
   try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+
+  if(window._fbDB){
+    window._fbDB.ref('ncgl2026/brackets/'+cls).update(bracketData)
+      .then(()=>{ console.log('Play-in saved to Firebase OK'); })
+      .catch(e=>{ console.error('Firebase play-in save error:',e); saveState(); });
+  } else {
+    saveState();
+  }
+
   closePoScoreModal();
   renderPlayoffsTab();
   if(isAdmin&&document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')) renderBracketAdminControls();
-  showToast('✓ '+winnerName+' wins play-in '+tsv+'–'+bsv+' and advances as #'+size+' seed!');
+  showToast('✓ '+winnerName+' wins play-in '+tsv+'–'+bsv+' — advances as #'+size+' seed!');
 }
 
 function clearPoScore(){
