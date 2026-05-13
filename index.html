@@ -2714,19 +2714,36 @@ function savePlayinInline(cls){
     }
   });
 
-  // Show success immediately
-  showToast('✓ '+winnerName+' advances as #'+size+' seed!');
+  // Persist to localStorage first (survives reload even without Firebase)
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
 
-  // Use saveState() — writes the complete state.brackets (already updated above)
-  // to ncgl2026 in Firebase. This is the same path the listener reads, guaranteeing
-  // the data survives reload. saveState() also writes localStorage.
-  saveState();
+  // Set protection window so listener won't overwrite while we write
+  _bracketSaveTime=Date.now()+15000;
 
-  // Re-render after a short delay so the listener has time to confirm the write
-  setTimeout(function(){
+  // Write ONLY the bracket data that changed — directly to Firebase paths
+  if(window._fbDB){
+    const bracketRef=window._fbDB.ref('ncgl2026/brackets/'+cls);
+    bracketRef.set(state.brackets[cls])
+      .then(function(){
+        _bracketSaveTime=Date.now()+5000;
+        showToast('✓ '+winnerName+' advances as #'+size+' seed!');
+        renderBracketAdminControls();
+        renderPlayoffsTab();
+      })
+      .catch(function(e){
+        console.error('Firebase write failed:',e);
+        // Fall back to full saveState
+        saveState();
+        showToast('✓ Saved (fallback)');
+        renderBracketAdminControls();
+        renderPlayoffsTab();
+      });
+  } else {
+    saveState();
+    showToast('✓ '+winnerName+' advances as #'+size+' seed!');
     renderBracketAdminControls();
     renderPlayoffsTab();
-  }, 400);
+  }
 }
 
 function clearPlayinInline(cls){
@@ -2754,12 +2771,23 @@ function clearPlayinInline(cls){
       }
     });
   }
-  showToast('✓ Play-in result cleared','tw');
-  saveState();
-  setTimeout(function(){
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+  _bracketSaveTime=Date.now()+15000;
+  if(window._fbDB){
+    window._fbDB.ref('ncgl2026/brackets/'+cls).set(state.brackets[cls])
+      .then(function(){
+        _bracketSaveTime=Date.now()+5000;
+        showToast('✓ Play-in result cleared','tw');
+        renderBracketAdminControls();
+        renderPlayoffsTab();
+      })
+      .catch(function(){ saveState(); showToast('✓ Cleared','tw'); renderBracketAdminControls(); renderPlayoffsTab(); });
+  } else {
+    saveState();
+    showToast('✓ Play-in result cleared','tw');
     renderBracketAdminControls();
     renderPlayoffsTab();
-  }, 400);
+  }
 }
 
 function renderBracket(cls){
@@ -4202,7 +4230,18 @@ if(isFirebaseConfigured){
         if(data.playinDate) state.playinDate=data.playinDate;
         if(data.playinVenue) state.playinVenue=data.playinVenue;
         try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
-        renderAll();
+        // Skip renderAll if a bracket write is in progress (protection window active)
+        if(Date.now()<_bracketSaveTime){
+          // Just update the visual without triggering _autoSyncBracket
+          renderConfStandings();
+          renderClassStandings();
+          renderSchedule();
+          renderResults();
+          updatePendingBubble();
+          updateTitle();
+        } else {
+          renderAll();
+        }
         setFBBanner('connected');
         // If Firebase still has stale team classes, push the corrected data back up once
         const fbJer = (data.teams||[]).find(t=>t.id==='JER');
