@@ -2685,7 +2685,7 @@ function savePlayinInline(cls){
   const winnerName=winnerIsChamp?pi.champTeam:pi.oppTeam;
   const size=(state.brackets[cls].slots&&state.brackets[cls].slots.length)||8;
 
-  // Write scores into playinMatch
+  // Write scores into playinMatch in state
   pi.champScore=tsv;
   pi.oppScore=bsv;
   pi.winnerId=winnerIsChamp?'champ':'opp';
@@ -2708,31 +2708,19 @@ function savePlayinInline(cls){
     }
   });
 
-  // Protect against listener overwrite for 10 seconds
-  _bracketSaveTime=Date.now()+10000;
-  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+  // Show success immediately
+  showToast('✓ '+winnerName+' advances as #'+size+' seed!');
 
-  if(window._fbDB){
-    window._fbDB.ref('ncgl2026/brackets').set(state.brackets)
-      .then(()=>{
-        _bracketSaveTime=Date.now()+3000;
-        showToast('✓ '+winnerName+' advances as #'+size+' seed!');
-        renderBracketAdminControls();
-        renderPlayoffsTab();
-      })
-      .catch(e=>{
-        console.error('Firebase error:',e);
-        saveState();
-        showToast('✓ Saved locally — check connection','tw');
-        renderBracketAdminControls();
-        renderPlayoffsTab();
-      });
-  } else {
-    saveState();
-    showToast('✓ '+winnerName+' advances as #'+size+' seed!');
+  // Use saveState() — writes the complete state.brackets (already updated above)
+  // to ncgl2026 in Firebase. This is the same path the listener reads, guaranteeing
+  // the data survives reload. saveState() also writes localStorage.
+  saveState();
+
+  // Re-render after a short delay so the listener has time to confirm the write
+  setTimeout(function(){
     renderBracketAdminControls();
     renderPlayoffsTab();
-  }
+  }, 400);
 }
 
 function clearPlayinInline(cls){
@@ -2760,23 +2748,12 @@ function clearPlayinInline(cls){
       }
     });
   }
-  _bracketSaveTime=Date.now()+10000;
-  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
-  if(window._fbDB){
-    window._fbDB.ref('ncgl2026/brackets').set(state.brackets)
-      .then(()=>{
-        _bracketSaveTime=Date.now()+3000;
-        showToast('✓ Play-in result cleared','tw');
-        renderBracketAdminControls();
-        renderPlayoffsTab();
-      })
-      .catch(e=>{ saveState(); showToast('✓ Cleared locally','tw'); renderBracketAdminControls(); renderPlayoffsTab(); });
-  } else {
-    saveState();
-    showToast('✓ Play-in result cleared','tw');
+  showToast('✓ Play-in result cleared','tw');
+  saveState();
+  setTimeout(function(){
     renderBracketAdminControls();
     renderPlayoffsTab();
-  }
+  }, 400);
 }
 
 function renderBracket(cls){
@@ -4197,23 +4174,15 @@ if(isFirebaseConfigured){
         if(data.confRules){state.confRules=data.confRules;}
         if(data.standingsOverrides){state.standingsOverrides=data.standingsOverrides;}
         if(data.brackets){
-          if(Date.now()-_bracketSaveTime < 0){
-            // Within active save-protection window — Firebase data is stale (write in flight).
-            // Keep everything in memory; only update visible flag which can't race.
-            ['A','B','C','D'].forEach(cls=>{
-              if(data.brackets[cls]&&state.brackets[cls]){
-                if(data.brackets[cls].visible!==undefined) state.brackets[cls].visible=data.brackets[cls].visible===true;
-              }
-            });
-          } else {
-            // Normal restore — take everything from Firebase, but preserve visible as boolean
-            state.brackets=data.brackets;
-            ['A','B','C','D'].forEach(cls=>{
-              if(state.brackets[cls]&&state.brackets[cls].visible!==undefined){
-                state.brackets[cls].visible=state.brackets[cls].visible===true;
-              }
-            });
-          }
+          // Always restore brackets from Firebase — this IS the source of truth.
+          // saveState() writes brackets there, so whatever is in Firebase is correct.
+          state.brackets=data.brackets;
+          // Ensure visible is always a strict boolean
+          ['A','B','C','D'].forEach(cls=>{
+            if(state.brackets[cls]&&state.brackets[cls].visible!==undefined){
+              state.brackets[cls].visible=state.brackets[cls].visible===true;
+            }
+          });
         }
         if(data.messages) state.messages=data.messages;
                 // Clean up any stale zero-game archives (e.g. accidental 2027 archive)
