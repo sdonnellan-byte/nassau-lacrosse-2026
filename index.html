@@ -2665,6 +2665,120 @@ function renderGameDateOverrides(cls,cfg){
   return out;
 }
 
+function savePlayinInline(cls){
+  if(!isAdmin)return;
+  const csEl=document.getElementById('pi-champ-score-'+cls);
+  const osEl=document.getElementById('pi-opp-score-'+cls);
+  const errEl=document.getElementById('pi-err-'+cls);
+  if(!csEl||!osEl)return;
+  const tsv=parseInt(csEl.value);
+  const bsv=parseInt(osEl.value);
+  errEl.textContent='';
+  if(isNaN(tsv)||isNaN(bsv)||tsv<0||bsv<0){errEl.textContent='Enter valid scores (0 or higher).';return;}
+  if(tsv===bsv){errEl.textContent='Scores cannot be tied — one team must win.';return;}
+
+  if(!state.brackets||!state.brackets[cls]||!state.brackets[cls].playinMatch){
+    errEl.textContent='Play-in data missing — try reloading.';return;
+  }
+  const pi=state.brackets[cls].playinMatch;
+  const winnerIsChamp=tsv>bsv;
+  const winnerName=winnerIsChamp?pi.champTeam:pi.oppTeam;
+  const size=(state.brackets[cls].slots&&state.brackets[cls].slots.length)||8;
+
+  // Write scores into playinMatch
+  pi.champScore=tsv;
+  pi.oppScore=bsv;
+  pi.winnerId=winnerIsChamp?'champ':'opp';
+
+  // Put winner into the last bracket slot
+  state.brackets[cls].slots[size-1]={seed:size,team:winnerName,teamId:null,score:null,winner:false,isPlayinSlot:false};
+
+  // Seed winner into first-round matchResult
+  if(!state.brackets[cls].matchResults) state.brackets[cls].matchResults={};
+  const mr=state.brackets[cls].matchResults;
+  const order=size===8?[[0,7],[3,4],[2,5],[1,6]]:size===4?[[0,3],[1,2]]:[];
+  order.forEach(function(pair,mi){
+    const hi=pair[0],lo=pair[1];
+    if(hi===size-1||lo===size-1){
+      const key='r0m'+mi;
+      if(!mr[key]) mr[key]={};
+      if(!mr[key].topScore&&!mr[key].botScore){
+        if(hi===size-1) mr[key].top=winnerName; else mr[key].bot=winnerName;
+      }
+    }
+  });
+
+  // Protect against listener overwrite for 10 seconds
+  _bracketSaveTime=Date.now()+10000;
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+
+  if(window._fbDB){
+    window._fbDB.ref('ncgl2026/brackets').set(state.brackets)
+      .then(()=>{
+        _bracketSaveTime=Date.now()+3000;
+        showToast('✓ '+winnerName+' advances as #'+size+' seed!');
+        renderBracketAdminControls();
+        renderPlayoffsTab();
+      })
+      .catch(e=>{
+        console.error('Firebase error:',e);
+        saveState();
+        showToast('✓ Saved locally — check connection','tw');
+        renderBracketAdminControls();
+        renderPlayoffsTab();
+      });
+  } else {
+    saveState();
+    showToast('✓ '+winnerName+' advances as #'+size+' seed!');
+    renderBracketAdminControls();
+    renderPlayoffsTab();
+  }
+}
+
+function clearPlayinInline(cls){
+  if(!isAdmin||!confirm('Clear play-in result? The bracket slot will revert to TBA.'))return;
+  if(!state.brackets||!state.brackets[cls]||!state.brackets[cls].playinMatch)return;
+  const pi=state.brackets[cls].playinMatch;
+  pi.champScore=null;
+  pi.oppScore=null;
+  pi.winnerId=null;
+  const size=(state.brackets[cls].slots&&state.brackets[cls].slots.length)||8;
+  state.brackets[cls].slots[size-1]={seed:size,team:'TBA — Play-In Winner',teamId:null,score:null,winner:false,isPlayinSlot:true};
+  // Clear first-round match result that had play-in winner
+  if(state.brackets[cls].matchResults){
+    const mr=state.brackets[cls].matchResults;
+    const order=size===8?[[0,7],[3,4],[2,5],[1,6]]:size===4?[[0,3],[1,2]]:[];
+    order.forEach(function(pair,mi){
+      const hi=pair[0],lo=pair[1];
+      if(hi===size-1||lo===size-1){
+        const key='r0m'+mi;
+        const st=mr[key];
+        if(st&&!st.topScore&&!st.botScore){
+          if(hi===size-1) delete st.top; else delete st.bot;
+          if(!Object.keys(st).length) delete mr[key];
+        }
+      }
+    });
+  }
+  _bracketSaveTime=Date.now()+10000;
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+  if(window._fbDB){
+    window._fbDB.ref('ncgl2026/brackets').set(state.brackets)
+      .then(()=>{
+        _bracketSaveTime=Date.now()+3000;
+        showToast('✓ Play-in result cleared','tw');
+        renderBracketAdminControls();
+        renderPlayoffsTab();
+      })
+      .catch(e=>{ saveState(); showToast('✓ Cleared locally','tw'); renderBracketAdminControls(); renderPlayoffsTab(); });
+  } else {
+    saveState();
+    showToast('✓ Play-in result cleared','tw');
+    renderBracketAdminControls();
+    renderPlayoffsTab();
+  }
+}
+
 function renderBracket(cls){
   initBrackets();
   const cfg=state.brackets[cls];
@@ -3405,11 +3519,43 @@ function renderBracketAdminControls(){
             <span style="font-size:10px;color:var(--gray)">✏️</span>
           </div>`).join('')}
         </div>
-        ${cfg.playinMatch?`<div style="margin-top:8px;padding:8px 11px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:6px;font-size:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-          <strong style="color:var(--gold)">⭐ Play-In:</strong>
-          <span>${cfg.playinMatch.champTeam} (C4 Champ) vs #${cfg.playinMatch.oppSeed} ${cfg.playinMatch.oppTeam}</span>
-          <button class="btn btn-ol btn-sm" onclick="openPlayinEdit('${cls}')">✏️ Edit Result</button>
-        </div>`:''}
+        ${cfg.playinMatch?(()=>{
+          const pi=cfg.playinMatch;
+          const hasScore=pi.champScore!=null&&pi.oppScore!=null;
+          const winnerName=hasScore?(pi.winnerId==='champ'?pi.champTeam:pi.oppTeam):'';
+          return `<div id="playin-score-${cls}" style="margin-top:10px;background:rgba(245,158,11,.1);border:2px solid rgba(245,158,11,.4);border-radius:8px;padding:14px 16px">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:14px;color:var(--gold);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px">
+              ⭐ Play-In Score Entry
+            </div>
+            <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">
+              ${pi.champTeam} <span style="color:var(--gray)">(Conf 4 Champ)</span> vs #${pi.oppSeed} ${pi.oppTeam}
+              ${hasScore?'<span style="color:var(--gold);font-weight:700;margin-left:8px">'+pi.champScore+'–'+pi.oppScore+'</span>'+' — <span style="color:var(--green);font-weight:700">'+winnerName+' advances</span>':''}
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <div style="text-align:center">
+                <div style="font-size:10px;color:var(--gray);margin-bottom:4px;text-transform:uppercase;letter-spacing:1px">${pi.champTeam}</div>
+                <input type="number" id="pi-champ-score-${cls}" min="0" max="99"
+                  value="${hasScore?pi.champScore:''}" placeholder="0"
+                  style="width:70px;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:28px;text-align:center;color:var(--gold);background:var(--navy);border:2px solid var(--border);border-radius:8px;padding:6px 4px">
+              </div>
+              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;color:var(--gray);padding-top:18px">–</div>
+              <div style="text-align:center">
+                <div style="font-size:10px;color:var(--gray);margin-bottom:4px;text-transform:uppercase;letter-spacing:1px">${pi.oppTeam}</div>
+                <input type="number" id="pi-opp-score-${cls}" min="0" max="99"
+                  value="${hasScore?pi.oppScore:''}" placeholder="0"
+                  style="width:70px;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:28px;text-align:center;color:var(--gold);background:var(--navy);border:2px solid var(--border);border-radius:8px;padding:6px 4px">
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;padding-top:18px">
+                <button class="btn btn-ok" onclick="savePlayinInline('${cls}')"
+                  style="font-size:13px;padding:8px 16px;white-space:nowrap">
+                  ✓ Save &amp; Advance Winner
+                </button>
+                ${hasScore?`<button class="btn btn-d btn-sm" onclick="clearPlayinInline('${cls}')">&#128465; Clear Result</button>`:''}
+              </div>
+            </div>
+            <div id="pi-err-${cls}" style="color:var(--red);font-size:12px;margin-top:6px"></div>
+          </div>`;
+        })():''}
       </div>`:''}
     </div>`;
   });
@@ -3596,7 +3742,7 @@ function closePoScoreModal(){
 }
 
 function savePoScore(){
-  if(_poModal.isPlayin){ savePlayinScore(); return; }
+  // Play-in scores are handled by savePlayinInline() — not this modal
   const {cls,key,ri,mi,topName,botName}=_poModal;
   if(!cls)return;
   const tsv=parseInt(document.getElementById('po-top-score').value);
@@ -3634,87 +3780,11 @@ function savePoScore(){
 }
 
 function savePlayinScore(){
-  const {cls}=_poModal;
-  if(!cls)return;
-  const tsv=parseInt(document.getElementById('po-top-score').value);
-  const bsv=parseInt(document.getElementById('po-bot-score').value);
-  const err=document.getElementById('po-score-err');
-  err.style.display='none';
-  if(isNaN(tsv)||isNaN(bsv)){err.textContent='Enter valid scores for both teams.';err.style.display='block';return;}
-  if(tsv===bsv){err.textContent='Scores cannot be tied — one team must win.';err.style.display='block';return;}
-  if(tsv<0||bsv<0){err.textContent='Scores cannot be negative.';err.style.display='block';return;}
-
-  // Read current playinMatch BEFORE any initBrackets() call (which resets fields)
-  if(!state.brackets||!state.brackets[cls]||!state.brackets[cls].playinMatch){
-    err.textContent='Play-in data not found. Please reload and try again.';err.style.display='block';return;
-  }
-  const pi=state.brackets[cls].playinMatch;
-  const champTeam=pi.champTeam;
-  const oppTeam=pi.oppTeam;
-  const oppSeed=pi.oppSeed;
-
-  // Determine winner
-  const winnerIsChamp=tsv>bsv;
-  const winnerName=winnerIsChamp?champTeam:oppTeam;
-  const size=(state.brackets[cls].slots&&state.brackets[cls].slots.length)||8;
-
-  // Update playinMatch scores
-  pi.champScore=tsv;
-  pi.oppScore=bsv;
-  pi.winnerId=winnerIsChamp?'champ':'opp';
-
-  // Advance winner into the last bracket slot
-  state.brackets[cls].slots[size-1]={
-    seed:size,
-    team:winnerName,
-    teamId:null,
-    score:null,
-    winner:false,
-    isPlayinSlot:false
-  };
-
-  // Seed winner into the first-round matchResult
-  if(!state.brackets[cls].matchResults) state.brackets[cls].matchResults={};
-  const matchResults=state.brackets[cls].matchResults;
-  const order=size===8?[[0,7],[3,4],[2,5],[1,6]]:size===4?[[0,3],[1,2]]:[];
-  order.forEach(function(pair,mi){
-    const hi=pair[0],lo=pair[1];
-    if(hi===size-1||lo===size-1){
-      const key='r0m'+mi;
-      if(!matchResults[key]) matchResults[key]={};
-      const st=matchResults[key];
-      if(!st.topScore&&!st.botScore){
-        if(hi===size-1) st.top=winnerName; else st.bot=winnerName;
-      }
-    }
-  });
-
-  // Set a long save-protection window so the Firebase listener won't overwrite us
-  _bracketSaveTime=Date.now()+8000; // protect for 8 seconds
-
-  // Persist to localStorage immediately — this is the source of truth on reload
-  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
-
-  // Write the full brackets node to Firebase
-  if(window._fbDB){
-    window._fbDB.ref('ncgl2026/brackets').set(state.brackets)
-      .then(()=>{
-        _bracketSaveTime=Date.now()+3000; // keep protection window alive after write
-        console.log('Play-in saved to Firebase OK');
-      })
-      .catch(e=>{ console.error('Firebase play-in save error:',e); saveState(); });
-  } else {
-    saveState();
-  }
-
-  closePoScoreModal();
-  renderPlayoffsTab();
-  if(isAdmin&&document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')) renderBracketAdminControls();
-  showToast('✓ '+winnerName+' wins play-in '+tsv+'–'+bsv+' — advances as #'+size+' seed!');
+  // Legacy — no longer used, routing removed
 }
 
 function clearPoScore(){
-  if(_poModal.isPlayin){ clearPlayinScore(); return; }
+  // Play-in clearing handled by clearPlayinInline()
   const {cls,key,ri,mi}=_poModal;
   if(!cls||!confirm('Clear this result and retract the bracket from this point forward?'))return;
   initBrackets();
@@ -3781,25 +3851,13 @@ function clearPlayinScore(){
 }
 
 function openPlayinEdit(cls){
+  // Scroll admin to the playin score section in the bracket admin controls
   if(!isAdmin)return;
-  initBrackets();
-  const cfg=state.brackets[cls];
-  const pi=cfg.playinMatch;
-  if(!pi)return;
-  // Use the same score modal — flag as play-in so savePoScore routes correctly
-  _poModal={cls,key:null,ri:0,mi:0,topName:pi.champTeam,botName:pi.oppTeam+'  (#'+pi.oppSeed+' seed)',isPlayin:true};
-  const clsLabel={A:'Class A',B:'Class B',C:'Class C',D:'Class D'}[cls]||'Class '+cls;
-  document.getElementById('po-score-title').textContent='⭐ '+clsLabel+' Play-In Game';
-  document.getElementById('po-score-round').textContent='Conference 4 Champion vs #'+pi.oppSeed+' Seed · Winner advances as #'+pi.oppSeed;
-  document.getElementById('po-top-lbl').textContent=pi.champTeam+' (Conf 4 Champ)';
-  document.getElementById('po-bot-lbl').textContent=pi.oppTeam+' (#'+pi.oppSeed+' seed)';
-  document.getElementById('po-score-err').style.display='none';
-  const hasResult=pi.champScore!=null&&pi.oppScore!=null;
-  document.getElementById('po-top-score').value=hasResult?pi.champScore:0;
-  document.getElementById('po-bot-score').value=hasResult?pi.oppScore:0;
-  document.getElementById('po-clear-btn').style.display=hasResult?'':'none';
-  document.getElementById('po-score-ov').classList.remove('hidden');
-  setTimeout(()=>document.getElementById('po-top-score').focus(),80);
+  switchAdminSub('playoffs',document.querySelector('.anb[onclick*="playoffs"]'));
+  setTimeout(()=>{
+    const el=document.getElementById('playin-score-'+cls);
+    if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
+  },200);
 }
 
 function editPlayinInfo(){
