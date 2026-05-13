@@ -2525,20 +2525,26 @@ function _autoSyncBracket(cls){
   // Update play-in and last slot
   const champ=getConf4QualifiersForClass(cls);
   if(champ){
-    const lastSeed=newSlots[size-1];
     const existingPI=cfg.playinMatch||{};
-    cfg.playinMatch={
-      champTeam:champ.name,champId:champ.id,champSeed:'C4 Champ',
-      oppTeam:lastSeed?lastSeed.team:'TBD',oppSeed:lastSeed?lastSeed.seed:size,
-      champScore:existingPI.champScore??null,
-      oppScore:existingPI.oppScore??null,
-      winnerId:existingPI.winnerId||null
-    };
-    // If play-in winner already decided, keep their name in the slot; otherwise TBA
+
+    // If play-in is already decided — preserve everything, don't touch the slot or scores
     if(existingPI.winnerId){
-      const resolvedWinner=existingPI.winnerId==='champ'?champ.name:(lastSeed?lastSeed.team:'TBD');
-      newSlots[size-1]={seed:size,team:resolvedWinner,teamId:null,score:null,winner:false,isPlayinSlot:false};
+      const winnerName=existingPI.winnerId==='champ'?existingPI.champTeam:existingPI.oppTeam;
+      // Keep the winner in the last slot
+      newSlots[size-1]={seed:size,team:winnerName,teamId:null,score:null,winner:false,isPlayinSlot:false};
+      // Keep playinMatch exactly as-is (scores, winnerId, team names all preserved)
+      // Just update champTeam in case conf standings changed (shouldn't normally happen post-decision)
+      cfg.playinMatch=existingPI;
     } else {
+      // No winner yet — normal flow: set up the play-in matchup
+      const lastSeed=newSlots[size-1];
+      cfg.playinMatch={
+        champTeam:champ.name,champId:champ.id,champSeed:'C4 Champ',
+        oppTeam:lastSeed?lastSeed.team:'TBD',oppSeed:lastSeed?lastSeed.seed:size,
+        champScore:existingPI.champScore??null,
+        oppScore:existingPI.oppScore??null,
+        winnerId:null
+      };
       newSlots[size-1]={seed:size,team:'TBA — Play-In Winner',teamId:null,score:null,winner:false,isPlayinSlot:true};
     }
   } else {
