@@ -3689,19 +3689,19 @@ function savePlayinScore(){
     }
   });
 
-  // Write directly to Firebase — do NOT call saveState() which triggers listener race
-  _bracketSaveTime=Date.now();
-  const bracketData={
-    playinMatch: state.brackets[cls].playinMatch,
-    slots: state.brackets[cls].slots,
-    matchResults: state.brackets[cls].matchResults
-  };
-  // Also persist to localStorage immediately so reload shows the result
+  // Set a long save-protection window so the Firebase listener won't overwrite us
+  _bracketSaveTime=Date.now()+8000; // protect for 8 seconds
+
+  // Persist to localStorage immediately — this is the source of truth on reload
   try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
 
+  // Write the full brackets node to Firebase
   if(window._fbDB){
-    window._fbDB.ref('ncgl2026/brackets/'+cls).update(bracketData)
-      .then(()=>{ console.log('Play-in saved to Firebase OK'); })
+    window._fbDB.ref('ncgl2026/brackets').set(state.brackets)
+      .then(()=>{
+        _bracketSaveTime=Date.now()+3000; // keep protection window alive after write
+        console.log('Play-in saved to Firebase OK');
+      })
       .catch(e=>{ console.error('Firebase play-in save error:',e); saveState(); });
   } else {
     saveState();
@@ -4139,22 +4139,22 @@ if(isFirebaseConfigured){
         if(data.confRules){state.confRules=data.confRules;}
         if(data.standingsOverrides){state.standingsOverrides=data.standingsOverrides;}
         if(data.brackets){
-          if(Date.now()-_bracketSaveTime < 3000){
-            // Within save protection window — restore matchResults and slots always,
-            // but skip restoring rounds/visible to avoid overwriting admin's just-saved date/venue
+          if(Date.now()-_bracketSaveTime < 0){
+            // Within active save-protection window — Firebase data is stale (write in flight).
+            // Keep everything in memory; only update visible flag which can't race.
             ['A','B','C','D'].forEach(cls=>{
               if(data.brackets[cls]&&state.brackets[cls]){
-                // Always restore scores — never block these
-                if(data.brackets[cls].matchResults!==undefined) state.brackets[cls].matchResults=data.brackets[cls].matchResults||{};
-                if(data.brackets[cls].slots) state.brackets[cls].slots=data.brackets[cls].slots;
-                if(data.brackets[cls].playinMatch!==undefined) state.brackets[cls].playinMatch=data.brackets[cls].playinMatch;
-                // Always restore visible as strict boolean from Firebase
                 if(data.brackets[cls].visible!==undefined) state.brackets[cls].visible=data.brackets[cls].visible===true;
               }
             });
           } else {
-            // Normal restore — take everything from Firebase
+            // Normal restore — take everything from Firebase, but preserve visible as boolean
             state.brackets=data.brackets;
+            ['A','B','C','D'].forEach(cls=>{
+              if(state.brackets[cls]&&state.brackets[cls].visible!==undefined){
+                state.brackets[cls].visible=state.brackets[cls].visible===true;
+              }
+            });
           }
         }
         if(data.messages) state.messages=data.messages;
