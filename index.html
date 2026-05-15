@@ -959,7 +959,22 @@ function adminLogout(){
 }
 
 // ── STANDINGS ─────────────────────────────────────────────────────────────
+// Standings cache — invalidated whenever game data changes
+let _standingsCache=null;
+let _standingsCacheKey='';
+
+function _invalidateStandingsCache(){_standingsCache=null;}
+
 function computeStandings(){
+  // Use a simple cache key: games length + last game played state
+  const key=JSON.stringify((state.games||[]).map(g=>g.played+','+(g.homeScore||0)+','+(g.awayScore||0)));
+  if(_standingsCache&&_standingsCacheKey===key) return _standingsCache;
+  _standingsCacheKey=key;
+  _standingsCache=_computeStandingsRaw();
+  return _standingsCache;
+}
+
+function _computeStandingsRaw(){
   const rec={};
   TEAMS.forEach(t=>{rec[t.id]={w:0,l:0,t:0,gf:0,ga:0,h2h:{}};TEAMS.forEach(o=>{if(o.id!==t.id)rec[t.id].h2h[o.id]={w:0,l:0,t:0};});});
   state.games.forEach(g=>{
@@ -977,6 +992,7 @@ function computeStandings(){
 // ── TIEBREAKER LOGIC ─────────────────────────────────────────────────────────
 // For 2-way ties: H2H direct record → best power win → wins → losses
 // For 3+ way ties: H2H record among tied group → best power win among group → record vs each other → wins → losses
+
 
 function powerWinScore(id, opponentIds, rec){
   // Returns the "power win" score: sum of opponent win-pcts for every win against opponents in the group
@@ -1255,7 +1271,7 @@ function adminSubmitScore(){
   g.played=true;
   // Write games directly to Firebase — avoids race condition with full saveState
   if(window._fbDB){
-    window._fbDB.ref('ncgl2026/games').set(state.games).catch(()=>saveState());
+    window._fbDB.ref('ncgl2026/games').set(state.games)||_invalidateStandingsCache()||_invalidateStandingsCache().catch(()=>saveState());
   } else {
     saveState();
   }
@@ -1433,16 +1449,16 @@ function populatePoMatchups(){
     if(byeSeeds>0){
       // Class B: First Round
       const ft=cfg.slots.slice(byeSeeds);
-      addMatch('r0m0',0,ft[0]?.team,ft[3]?.team); // 7v10 → plays #1
-      addMatch('r0m1',0,ft[1]?.team,ft[2]?.team); // 8v9  → plays #2
+      addMatch('r0m0',0,ft[1]?.team,ft[2]?.team); // 8v9
+      addMatch('r0m1',0,ft[0]?.team,ft[3]?.team); // 7v10
       // QF
       const fr0=matchResults['r0m0']||{};const fr1=matchResults['r0m1']||{};
       const fr0w=fr0.winner==='top'?fr0.top:fr0.winner==='bot'?fr0.bot:null;
       const fr1w=fr1.winner==='top'?fr1.top:fr1.winner==='bot'?fr1.bot:null;
-      addMatch('r1m0',1,cfg.slots[0]?.team,fr0w||null); // #1 Garden City plays 8v9 winner
+      addMatch('r1m0',1,cfg.slots[1]?.team,fr0w||null); // #2 Manhasset vs 7v10 winner
       addMatch('r1m1',1,cfg.slots[3]?.team,cfg.slots[4]?.team);
       addMatch('r1m2',1,cfg.slots[2]?.team,cfg.slots[5]?.team);
-      addMatch('r1m3',1,cfg.slots[1]?.team,fr1w||null); // #2 Manhasset plays 7v10 winner
+      addMatch('r1m3',1,cfg.slots[0]?.team,fr1w||null); // #1 Garden City vs 8v9 winner
       // SF
       [[2,0,1],[2,1,2],[2,2,3]].forEach(([ri2,mi2])=>{
         const p1=matchResults[`r1m${mi2*2}`]||{};const p2=matchResults[`r1m${mi2*2+1}`]||{};
@@ -1560,7 +1576,7 @@ function saveEdit(){
   g.homeScore=clampScore(document.getElementById('edit-hs').value);
   g.awayScore=clampScore(document.getElementById('edit-as').value);
   g.played=true;
-  if(window._fbDB){window._fbDB.ref('ncgl2026/games').set(state.games).catch(()=>saveState());}else{saveState();}
+  if(window._fbDB){window._fbDB.ref('ncgl2026/games').set(state.games)||_invalidateStandingsCache()||_invalidateStandingsCache().catch(()=>saveState());}else{saveState();}
   try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
   renderAll();closeEdit();showToast('✓ Score updated');
 }
@@ -1568,7 +1584,7 @@ function deleteResult(){
   if(!editGameId||!confirm('Remove this result?'))return;
   const g=state.games.find(x=>x.id===editGameId);if(!g)return;
   g.played=false;g.homeScore=null;g.awayScore=null;
-  if(window._fbDB){window._fbDB.ref('ncgl2026/games').set(state.games).catch(()=>saveState());}else{saveState();}
+  if(window._fbDB){window._fbDB.ref('ncgl2026/games').set(state.games)||_invalidateStandingsCache()||_invalidateStandingsCache().catch(()=>saveState());}else{saveState();}
   try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
   renderAll();closeEdit();showToast('Result removed','tw');
 }
@@ -2527,19 +2543,11 @@ function _autoSyncBracket(cls){
   if(champ){
     const existingPI=cfg.playinMatch||{};
     const lastSeed=newSlots[size-1];
-    // matchResults['playin'] is the reliable source of truth — saved same as other scores
     const playinResult=(cfg.matchResults&&cfg.matchResults['playin'])||null;
     if(playinResult&&playinResult.winnerName){
-      // Result exists — put winner in last slot
       const winnerName=playinResult.winnerName;
       newSlots[size-1]={seed:size,team:winnerName,teamId:null,score:null,winner:false,isPlayinSlot:false};
-      cfg.playinMatch={
-        champTeam:champ.name,champId:champ.id,champSeed:'C4 Champ',
-        oppTeam:existingPI.oppTeam||lastSeed.team,oppSeed:existingPI.oppSeed||size,
-        champScore:playinResult.topScore,oppScore:playinResult.botScore,
-        winnerId:playinResult.winner==='top'?'champ':'opp'
-      };
-      // Seed winner into first-round matchResult if not already scored
+      cfg.playinMatch={champTeam:champ.name,champId:champ.id,champSeed:'C4 Champ',oppTeam:existingPI.oppTeam||lastSeed.team,oppSeed:existingPI.oppSeed||size,champScore:playinResult.topScore,oppScore:playinResult.botScore,winnerId:playinResult.winner==='top'?'champ':'opp'};
       if(!cfg.matchResults) cfg.matchResults={};
       const ord=size===8?[[0,7],[3,4],[2,5],[1,6]]:size===4?[[0,3],[1,2]]:[];
       ord.forEach(function(pair,mi2){
@@ -2552,12 +2560,7 @@ function _autoSyncBracket(cls){
         }
       });
     } else {
-      // No result yet — TBA
-      cfg.playinMatch={
-        champTeam:champ.name,champId:champ.id,champSeed:'C4 Champ',
-        oppTeam:lastSeed?lastSeed.team:'TBD',oppSeed:lastSeed?lastSeed.seed:size,
-        champScore:existingPI.champScore??null,oppScore:existingPI.oppScore??null,winnerId:null
-      };
+      cfg.playinMatch={champTeam:champ.name,champId:champ.id,champSeed:'C4 Champ',oppTeam:lastSeed?lastSeed.team:'TBD',oppSeed:lastSeed?lastSeed.seed:size,champScore:existingPI.champScore??null,oppScore:existingPI.oppScore??null,winnerId:null};
       newSlots[size-1]={seed:size,team:'TBA — Play-In Winner',teamId:null,score:null,winner:false,isPlayinSlot:true};
     }
   } else {
@@ -2602,11 +2605,7 @@ function getGameDateVenue(cfg,key,ri){
   const st=(cfg.matchResults&&cfg.matchResults[key])||{};
   const rounds=cfg.rounds||[];
   const roundInfo=rounds[ri]||{};
-  return{
-    date: st.dateOverride!==undefined ? st.dateOverride : (roundInfo.date||''),
-    venue: st.venueOverride!==undefined ? st.venueOverride : (roundInfo.venue||''),
-    hasOverride: st.dateOverride!==undefined || st.venueOverride!==undefined
-  };
+  return{date:st.dateOverride!==undefined?st.dateOverride:(roundInfo.date||''),venue:st.venueOverride!==undefined?st.venueOverride:(roundInfo.venue||''),hasOverride:st.dateOverride!==undefined||st.venueOverride!==undefined};
 }
 
 function editGameDate(cls,key,ri){
@@ -2644,12 +2643,12 @@ function renderGameDateOverrides(cls,cfg){
   const rounds2=cfg.rounds||DEFAULT_BRACKET_CONFIG[cls].rounds;
   const matchKeys=[];
   if(byeSeeds2>0){
-    matchKeys.push({key:'r0m0',ri:0,label:'First Round: #7 vs #10 (plays #1)'});
-    matchKeys.push({key:'r0m1',ri:0,label:'First Round: #8 vs #9 (plays #2)'});
-    matchKeys.push({key:'r1m0',ri:1,label:'QF: #1 vs FR Winner'});
+    matchKeys.push({key:'r0m0',ri:0,label:'First Round: #7 vs #10 (plays #2)'});
+    matchKeys.push({key:'r0m1',ri:0,label:'First Round: #8 vs #9 (plays #1)'});
+    matchKeys.push({key:'r1m0',ri:1,label:'QF: #2 vs FR Winner'});
     matchKeys.push({key:'r1m1',ri:1,label:'QF: #4 vs #5'});
     matchKeys.push({key:'r1m2',ri:1,label:'QF: #3 vs #6'});
-    matchKeys.push({key:'r1m3',ri:1,label:'QF: #2 vs FR Winner'});
+    matchKeys.push({key:'r1m3',ri:1,label:'QF: #1 vs FR Winner'});
     matchKeys.push({key:'r2m0',ri:2,label:'Semifinal 1'});
     matchKeys.push({key:'r2m1',ri:2,label:'Semifinal 2'});
     matchKeys.push({key:'r3m0',ri:3,label:'Final'});
@@ -2663,102 +2662,15 @@ function renderGameDateOverrides(cls,cfg){
       for(let m2=0;m2<cnt2;m2++) matchKeys.push({key:'r'+r2+'m'+m2,ri:r2,label:(rounds2[r2]&&rounds2[r2].name||'Round '+(r2+1))+' Game '+(m2+1)});
     }
   }
-  let out='<div style="margin-top:12px;margin-bottom:4px">'
-    +'<div style="font-size:11px;color:var(--gray);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;font-weight:700">Per-Game Date/Venue Overrides</div>'
-    +'<div style="font-size:10px;color:var(--text-dim);margin-bottom:7px">Set a custom date or venue for any individual game. Gold = override active. Clear to revert to round default.</div>';
+  let out='<div style="margin-top:12px;margin-bottom:4px"><div style="font-size:11px;color:var(--gray);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;font-weight:700">Per-Game Date/Venue Overrides</div><div style="font-size:10px;color:var(--text-dim);margin-bottom:7px">Set a custom date or venue for any game. Gold = override active.</div>';
   matchKeys.forEach(function(mk){
     const gdv=getGameDateVenue(cfg,mk.key,mk.ri);
-    const overrideHtml=gdv.hasOverride
-      ?('<span style="color:var(--gold);font-size:10px">'+gdv.date+(gdv.venue?' · '+gdv.venue:'')+'</span>')
-      :'<span style="color:var(--border);font-size:10px">round default</span>';
-    out+='<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--navy);border-radius:6px;margin-bottom:3px;font-size:11px">'
-      +'<span style="flex:1;color:var(--text-dim)">'+mk.label+'</span>'
-      +overrideHtml
-      +'<button data-cls="'+cls+'" data-key="'+mk.key+'" data-ri="'+mk.ri+'" '
-      +'onclick="editGameDate(this.dataset.cls,this.dataset.key,parseInt(this.dataset.ri))" '
-      +'style="background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-size:10px;color:var(--gray);padding:1px 6px">&#128197; Edit</button>'
-      +'</div>';
+    const ovHtml=gdv.hasOverride?('<span style="color:var(--gold);font-size:10px">'+gdv.date+(gdv.venue?' · '+gdv.venue:'')+'</span>'):'<span style="color:var(--border);font-size:10px">round default</span>';
+    out+='<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--navy);border-radius:6px;margin-bottom:3px;font-size:11px"><span style="flex:1;color:var(--text-dim)">'+mk.label+'</span>'+ovHtml+'<button data-cls="'+cls+'" data-key="'+mk.key+'" data-ri="'+mk.ri+'" onclick="editGameDate(this.dataset.cls,this.dataset.key,parseInt(this.dataset.ri))" style="background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-size:10px;color:var(--gray);padding:1px 6px">&#128197; Edit</button></div>';
   });
   out+='</div>';
   return out;
 }
-
-function savePlayinInline(cls){
-  if(!isAdmin)return;
-  const csEl=document.getElementById('pi-champ-score-'+cls);
-  const osEl=document.getElementById('pi-opp-score-'+cls);
-  const errEl=document.getElementById('pi-err-'+cls);
-  if(!csEl||!osEl)return;
-  const tsv=parseInt(csEl.value);
-  const bsv=parseInt(osEl.value);
-  errEl.textContent='';
-  if(isNaN(tsv)||isNaN(bsv)||tsv<0||bsv<0){errEl.textContent='Enter valid scores (0 or higher).';return;}
-  if(tsv===bsv){errEl.textContent='Scores cannot be tied — one team must win.';return;}
-  if(!state.brackets||!state.brackets[cls]||!state.brackets[cls].playinMatch){
-    errEl.textContent='Play-in data missing — try reloading.';return;
-  }
-  const pi=state.brackets[cls].playinMatch;
-  const winnerIsChamp=tsv>bsv;
-  const winnerName=winnerIsChamp?pi.champTeam:pi.oppTeam;
-  const size=(state.brackets[cls].slots&&state.brackets[cls].slots.length)||8;
-
-  // Store result in matchResults['playin'] — same mechanism as all other bracket scores
-  if(!state.brackets[cls].matchResults) state.brackets[cls].matchResults={};
-  state.brackets[cls].matchResults['playin']={
-    top:pi.champTeam, bot:pi.oppTeam,
-    topScore:tsv, botScore:bsv,
-    winner:winnerIsChamp?'top':'bot',
-    winnerName:winnerName,
-    oppSeed:pi.oppSeed
-  };
-
-  // Update playinMatch for display
-  pi.champScore=tsv; pi.oppScore=bsv;
-  pi.winnerId=winnerIsChamp?'champ':'opp';
-
-  // Write matchResults to Firebase (same path that works for all other scores)
-  _bracketSaveTime=Date.now();
-  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
-  if(window._fbDB){
-    window._fbDB.ref('ncgl2026/brackets/'+cls+'/matchResults').set(state.brackets[cls].matchResults)
-      .then(function(){ return window._fbDB.ref('ncgl2026/brackets/'+cls+'/playinMatch').set(pi); })
-      .then(function(){
-        showToast('✓ '+winnerName+' advances as #'+size+' seed!');
-        renderBracketAdminControls(); renderPlayoffsTab();
-      })
-      .catch(function(e){ console.error(e); saveState(); showToast('✓ Saved'); renderBracketAdminControls(); renderPlayoffsTab(); });
-  } else {
-    saveState();
-    showToast('✓ '+winnerName+' advances as #'+size+' seed!');
-    renderBracketAdminControls(); renderPlayoffsTab();
-  }
-}
-
-
-function clearPlayinInline(cls){
-  if(!isAdmin||!confirm('Clear play-in result? The bracket slot will revert to TBA.'))return;
-  if(!state.brackets||!state.brackets[cls])return;
-  if(state.brackets[cls].matchResults) delete state.brackets[cls].matchResults['playin'];
-  if(state.brackets[cls].playinMatch){
-    state.brackets[cls].playinMatch.champScore=null;
-    state.brackets[cls].playinMatch.oppScore=null;
-    state.brackets[cls].playinMatch.winnerId=null;
-  }
-  _bracketSaveTime=Date.now();
-  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
-  if(window._fbDB){
-    const updates={};
-    updates['ncgl2026/brackets/'+cls+'/matchResults']=state.brackets[cls].matchResults||{};
-    updates['ncgl2026/brackets/'+cls+'/playinMatch']=state.brackets[cls].playinMatch||null;
-    window._fbDB.ref().update(updates)
-      .then(function(){ showToast('✓ Play-in result cleared','tw'); renderBracketAdminControls(); renderPlayoffsTab(); })
-      .catch(function(){ saveState(); showToast('✓ Cleared','tw'); renderBracketAdminControls(); renderPlayoffsTab(); });
-  } else {
-    saveState(); showToast('✓ Play-in result cleared','tw');
-    renderBracketAdminControls(); renderPlayoffsTab();
-  }
-}
-
 
 function renderBracket(cls){
   initBrackets();
@@ -2777,37 +2689,31 @@ function renderBracket(cls){
     // Class B special layout: render as custom HTML so FR games align visually with their QF opponent
     // 8v9 winner → plays #1 (top), 7v10 winner → plays #2 (bottom)
     const ft=slots.slice(byeSeeds); // [seed7, seed8, seed9, seed10]
-    const s89=[ft[1],ft[2]];   // #8 vs #9  (r0m0, TOP)  → winner plays #1 Garden City
-    const s710=[ft[0],ft[3]];  // #7 vs #10 (r0m1, BOT)  → winner plays #2 Manhasset
-    const fr0=cfg.matchResults['r0m0']||{}; // 8v9 result  (top FR game)
-    const fr1=cfg.matchResults['r0m1']||{}; // 7v10 result (bottom FR game)
+    const s710=[ft[0],ft[3]]; // #7 vs #10 (r0m0, TOP) -> winner plays #2 Manhasset
+    const s89=[ft[1],ft[2]];  // #8 vs #9  (r0m1, BOT) -> winner plays #1 Garden City
+    const fr0=cfg.matchResults['r0m0']||{}; // 7v10 result (top FR game)
+    const fr1=cfg.matchResults['r0m1']||{}; // 8v9 result  (bot FR game)
     const fr0winner=fr0.winner==='top'?fr0.top:fr0.winner==='bot'?fr0.bot:'TBA';
     const fr1winner=fr1.winner==='top'?fr1.top:fr1.winner==='bot'?fr1.bot:'TBA';
 
-    // QF: top FR (8v9, r0m0) winner → #1 Garden City (r1m0 top)
-    //     bot FR (7v10, r0m1) winner → #2 Manhasset   (r1m3 bot)
+    // QF: TOP: #2 Manhasset vs 7v10 winner | BOT: #1 Garden City vs 8v9 winner
     const qf=[
-      {key:'r1m0',top:{seed:slots[0]?.seed,team:slots[0]?.team||'TBD'},bot:{seed:'',team:fr0winner!=='TBA'?fr0winner:'TBA — 8v9 Winner'},frGame:'top'},
+      {key:'r1m0',top:{seed:slots[1]?.seed,team:slots[1]?.team||'TBD'},bot:{seed:'',team:fr0winner!=='TBA'?fr0winner:'TBA — 7v10 Winner'},frGame:'top'},
       {key:'r1m1',top:{seed:slots[3]?.seed,team:slots[3]?.team||'TBD'},bot:{seed:slots[4]?.seed,team:slots[4]?.team||'TBD'},frGame:null},
       {key:'r1m2',top:{seed:slots[2]?.seed,team:slots[2]?.team||'TBD'},bot:{seed:slots[5]?.seed,team:slots[5]?.team||'TBD'},frGame:null},
-      {key:'r1m3',top:{seed:slots[1]?.seed,team:slots[1]?.team||'TBD'},bot:{seed:'',team:fr1winner!=='TBA'?fr1winner:'TBA — 7v10 Winner'},frGame:'bot'},
+      {key:'r1m3',top:{seed:slots[0]?.seed,team:slots[0]?.team||'TBD'},bot:{seed:'',team:fr1winner!=='TBA'?fr1winner:'TBA — 8v9 Winner'},frGame:'bot'},
     ];
     // Override with stored QF results if present
     qf.forEach(qm=>{
       const st=cfg.matchResults[qm.key]||{};
-      // For r1m0/r1m3: bot comes from FR result, not from matchResults.bot
-      // (matchResults.bot may be stale from a previous incorrect write)
-      // Only use matchResults values when the QF game itself has scores
-      if(st.topScore!=null&&st.botScore!=null){
-        // QF was actually played — use stored result
-        if(st.top) qm.top={...qm.top,team:st.top,score:st.topScore??null,winner:st.winner==='top'};
-        if(st.bot) qm.bot={...qm.bot,team:st.bot,score:st.botScore??null,winner:st.winner==='bot'};
-        if(st.winner==='top') qm.top.winner=true;
-        if(st.winner==='bot') qm.bot.winner=true;
-      } else if(st.top&&(qm.key==='r1m1'||qm.key==='r1m2')){
-        // For middle QF games (#4v#5, #3v#6) — top is a seeded team, restore it
-        qm.top={...qm.top,team:st.top};
+      if(st.top){qm.top={...qm.top,team:st.top,score:st.topScore??null,winner:st.winner==='top'};}
+      if(st.bot){
+        // Only override bot if it has an actual team (don't overwrite TBA with empty)
+        const newBot={...qm.bot,team:st.bot,score:st.botScore??null,winner:st.winner==='bot'};
+        qm.bot=newBot;
       }
+      if(st.winner==='top') qm.top.winner=true;
+      if(st.winner==='bot') qm.bot.winner=true;
     });
 
     // SF
@@ -2849,15 +2755,13 @@ function renderBracket(cls){
       <div style="display:flex;flex-direction:column;height:100%;justify-content:space-between;padding:6px 6px">`;
     // 8v9 at top
     html+=`<div class="bracket-match" style="margin-bottom:0">`;
-    html+=mkFRSlot({seed:s89[0]?.seed,team:s89[0]?.team||'TBD',score:fr0.topScore??null,winner:fr0.winner==='top'},'r0m0',0,0);
-    html+=mkFRSlot({seed:s89[1]?.seed,team:s89[1]?.team||'TBD',score:fr0.botScore??null,winner:fr0.winner==='bot'},'r0m0',0,0);
+    html+=mkFRSlot({seed:s710[0]?.seed,team:s710[0]?.team||'TBD',score:fr0.topScore??null,winner:fr0.winner==='top'},'r0m0',0,0);
+    html+=mkFRSlot({seed:s710[1]?.seed,team:s710[1]?.team||'TBD',score:fr0.botScore??null,winner:fr0.winner==='bot'},'r0m0',0,0);
     html+=`</div>`;
-    // spacer
     html+=`<div style="flex:1"></div>`;
-    // 7v10 at bottom
     html+=`<div class="bracket-match" style="margin-top:0">`;
-    html+=mkFRSlot({seed:s710[0]?.seed,team:s710[0]?.team||'TBD',score:fr1.topScore??null,winner:fr1.winner==='top'},'r0m1',0,1);
-    html+=mkFRSlot({seed:s710[1]?.seed,team:s710[1]?.team||'TBD',score:fr1.botScore??null,winner:fr1.winner==='bot'},'r0m1',0,1);
+    html+=mkFRSlot({seed:s89[0]?.seed,team:s89[0]?.team||'TBD',score:fr1.topScore??null,winner:fr1.winner==='top'},'r0m1',0,1);
+    html+=mkFRSlot({seed:s89[1]?.seed,team:s89[1]?.team||'TBD',score:fr1.botScore??null,winner:fr1.winner==='bot'},'r0m1',0,1);
     html+=`</div>`;
     html+=`</div></div>`;
 
@@ -2955,29 +2859,18 @@ function renderBracket(cls){
       matchupOrder.forEach(([hi,lo],mi)=>{
         const hSlot=slots[hi]||{seed:hi+1,team:'TBD'};
         const lSlot=slots[lo]||{seed:lo+1,team:'TBD'};
-        // Overlay scores from matchResults so first-round scores display
         const r0st=cfg.matchResults&&cfg.matchResults['r0m'+mi]||{};
-        r0.push([
-          {...hSlot, score:r0st.topScore??null, winner:r0st.winner==='top'},
-          {...lSlot, score:r0st.botScore??null, winner:r0st.winner==='bot'}
-        ]);
+        r0.push([{...hSlot,score:r0st.topScore??null,winner:r0st.winner==='top'},{...lSlot,score:r0st.botScore??null,winner:r0st.winner==='bot'}]);
       });
     } else if(size===4){
       // 1v4, 2v3
-      const r0st0=cfg.matchResults&&cfg.matchResults['r0m0']||{};
-      const r0st1=cfg.matchResults&&cfg.matchResults['r0m1']||{};
-      const s0=slots[0]||{seed:1,team:'TBD'};const s3=slots[3]||{seed:4,team:'TBD'};
-      const s1=slots[1]||{seed:2,team:'TBD'};const s2=slots[2]||{seed:3,team:'TBD'};
-      r0.push([{...s0,score:r0st0.topScore??null,winner:r0st0.winner==='top'},{...s3,score:r0st0.botScore??null,winner:r0st0.winner==='bot'}]);
-      r0.push([{...s1,score:r0st1.topScore??null,winner:r0st1.winner==='top'},{...s2,score:r0st1.botScore??null,winner:r0st1.winner==='bot'}]);
+      r0.push([slots[0]||{seed:1,team:'TBD'},slots[3]||{seed:4,team:'TBD'}]);
+      r0.push([slots[1]||{seed:2,team:'TBD'},slots[2]||{seed:3,team:'TBD'}]);
     } else {
       // Generic fallback for other sizes
       const half=Math.ceil(size/2);
       for(let i=0;i<half;i++){
-        const gst=cfg.matchResults&&cfg.matchResults['r0m'+i]||{};
-        const ghi=slots[i]||{seed:i+1,team:'TBD'};
-        const glo=slots[size-1-i]||{seed:size-i,team:'TBD'};
-        r0.push([{...ghi,score:gst.topScore??null,winner:gst.winner==='top'},{...glo,score:gst.botScore??null,winner:gst.winner==='bot'}]);
+        r0.push([slots[i]||{seed:i+1,team:'TBD'},slots[size-1-i]||{seed:size-i,team:'TBD'}]);
       }
     }
     allRounds.push(r0);
@@ -3338,8 +3231,8 @@ function renderBlankBracket(cls){
     // Class B: custom aligned layout — FR games pinned to top/bottom adjacent to their QF opponent
     const s=(i)=>hasSeeds&&slots[i]?slots[i].seed:i+1;
     const ft=hasSeeds?slots.slice(byeSeeds):[];
-    const fr0top=ft[1]?.seed||8; const fr0bot=ft[2]?.seed||9;   // 8v9  TOP game (r0m0) → plays #1 Garden City
-    const fr1top=ft[0]?.seed||7; const fr1bot=ft[3]?.seed||10;  // 7v10 BOT game (r0m1) → plays #2 Manhasset
+    const fr0top=ft[1]?.seed||8; const fr0bot=ft[2]?.seed||9;   // 8v9
+    const fr1top=ft[0]?.seed||7; const fr1bot=ft[3]?.seed||10;  // 7v10
     const roundTitleStyle=`font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--gray);text-align:center;padding:6px 0 10px`;
     const mkSeedSlot=(seed,label)=>`<div class="bracket-slot">
       <span class="bracket-seed" style="color:${seed?'var(--gold)':'var(--gray)'}">${seed||'—'}</span>
@@ -3531,27 +3424,20 @@ function renderBracketAdminControls(){
             </div>
             <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px">
               ${pi.champTeam} <span style="color:var(--gray)">(Conf 4 Champ)</span> vs #${pi.oppSeed} ${pi.oppTeam}
-              ${hasScore?'<span style="color:var(--gold);font-weight:700;margin-left:8px">'+piChampScore+'–'+piOppScore+'</span>'+' — <span style="color:var(--green);font-weight:700">'+winnerName+' advances</span>':''}
+              ${hasScore?`<span style="color:var(--gold);font-weight:700;margin-left:8px">${piChampScore}–${piOppScore}</span> — <span style="color:var(--green);font-weight:700">${winnerName} advances</span>`:''}
             </div>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
               <div style="text-align:center">
                 <div style="font-size:10px;color:var(--gray);margin-bottom:4px;text-transform:uppercase;letter-spacing:1px">${pi.champTeam}</div>
-                <input type="number" id="pi-champ-score-${cls}" min="0" max="99"
-                  value="${hasScore?piChampScore:''}" placeholder="0"
-                  style="width:70px;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:28px;text-align:center;color:var(--gold);background:var(--navy);border:2px solid var(--border);border-radius:8px;padding:6px 4px">
+                <input type="number" id="pi-champ-score-${cls}" min="0" max="99" value="${hasScore?piChampScore:''}" placeholder="0" style="width:70px;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:28px;text-align:center;color:var(--gold);background:var(--navy);border:2px solid var(--border);border-radius:8px;padding:6px 4px">
               </div>
               <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;color:var(--gray);padding-top:18px">–</div>
               <div style="text-align:center">
                 <div style="font-size:10px;color:var(--gray);margin-bottom:4px;text-transform:uppercase;letter-spacing:1px">${pi.oppTeam}</div>
-                <input type="number" id="pi-opp-score-${cls}" min="0" max="99"
-                  value="${hasScore?piOppScore:''}" placeholder="0"
-                  style="width:70px;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:28px;text-align:center;color:var(--gold);background:var(--navy);border:2px solid var(--border);border-radius:8px;padding:6px 4px">
+                <input type="number" id="pi-opp-score-${cls}" min="0" max="99" value="${hasScore?piOppScore:''}" placeholder="0" style="width:70px;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:28px;text-align:center;color:var(--gold);background:var(--navy);border:2px solid var(--border);border-radius:8px;padding:6px 4px">
               </div>
               <div style="display:flex;flex-direction:column;gap:6px;padding-top:18px">
-                <button class="btn btn-ok" onclick="savePlayinInline('${cls}')"
-                  style="font-size:13px;padding:8px 16px;white-space:nowrap">
-                  ✓ Save &amp; Advance Winner
-                </button>
+                <button class="btn btn-ok" onclick="savePlayinInline('${cls}')" style="font-size:13px;padding:8px 16px;white-space:nowrap">✓ Save &amp; Advance Winner</button>
                 ${hasScore?`<button class="btn btn-d btn-sm" onclick="clearPlayinInline('${cls}')">&#128465; Clear Result</button>`:''}
               </div>
             </div>
@@ -3612,6 +3498,52 @@ function editRoundInfo(cls,ri){
   }
   renderBracketAdminControls();
   renderPlayoffsTab();
+}
+
+function savePlayinInline(cls){
+  if(!isAdmin)return;
+  const csEl=document.getElementById('pi-champ-score-'+cls);
+  const osEl=document.getElementById('pi-opp-score-'+cls);
+  const errEl=document.getElementById('pi-err-'+cls);
+  if(!csEl||!osEl)return;
+  const tsv=parseInt(csEl.value);
+  const bsv=parseInt(osEl.value);
+  errEl.textContent='';
+  if(isNaN(tsv)||isNaN(bsv)||tsv<0||bsv<0){errEl.textContent='Enter valid scores (0 or higher).';return;}
+  if(tsv===bsv){errEl.textContent='Scores cannot be tied — one team must win.';return;}
+  if(!state.brackets||!state.brackets[cls]||!state.brackets[cls].playinMatch){errEl.textContent='Play-in data missing — try reloading.';return;}
+  const pi=state.brackets[cls].playinMatch;
+  const winnerIsChamp=tsv>bsv;
+  const winnerName=winnerIsChamp?pi.champTeam:pi.oppTeam;
+  const size=(state.brackets[cls].slots&&state.brackets[cls].slots.length)||8;
+  if(!state.brackets[cls].matchResults) state.brackets[cls].matchResults={};
+  state.brackets[cls].matchResults['playin']={top:pi.champTeam,bot:pi.oppTeam,topScore:tsv,botScore:bsv,winner:winnerIsChamp?'top':'bot',winnerName:winnerName,oppSeed:pi.oppSeed};
+  pi.champScore=tsv; pi.oppScore=bsv; pi.winnerId=winnerIsChamp?'champ':'opp';
+  _bracketSaveTime=Date.now();
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+  if(window._fbDB){
+    window._fbDB.ref('ncgl2026/brackets/'+cls+'/matchResults').set(state.brackets[cls].matchResults)
+      .then(function(){return window._fbDB.ref('ncgl2026/brackets/'+cls+'/playinMatch').set(pi);})
+      .then(function(){showToast('✓ '+winnerName+' advances as #'+size+' seed!');renderBracketAdminControls();renderPlayoffsTab();})
+      .catch(function(e){console.error(e);saveState();showToast('✓ Saved');renderBracketAdminControls();renderPlayoffsTab();});
+  } else {saveState();showToast('✓ '+winnerName+' advances as #'+size+' seed!');renderBracketAdminControls();renderPlayoffsTab();}
+}
+
+function clearPlayinInline(cls){
+  if(!isAdmin||!confirm('Clear play-in result? The bracket slot will revert to TBA.'))return;
+  if(!state.brackets||!state.brackets[cls])return;
+  if(state.brackets[cls].matchResults) delete state.brackets[cls].matchResults['playin'];
+  if(state.brackets[cls].playinMatch){state.brackets[cls].playinMatch.champScore=null;state.brackets[cls].playinMatch.oppScore=null;state.brackets[cls].playinMatch.winnerId=null;}
+  _bracketSaveTime=Date.now();
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+  if(window._fbDB){
+    const updates={};
+    updates['ncgl2026/brackets/'+cls+'/matchResults']=state.brackets[cls].matchResults||{};
+    updates['ncgl2026/brackets/'+cls+'/playinMatch']=state.brackets[cls].playinMatch||null;
+    window._fbDB.ref().update(updates)
+      .then(function(){showToast('✓ Play-in result cleared','tw');renderBracketAdminControls();renderPlayoffsTab();})
+      .catch(function(){saveState();showToast('✓ Cleared','tw');renderBracketAdminControls();renderPlayoffsTab();});
+  } else {saveState();showToast('✓ Play-in result cleared','tw');renderBracketAdminControls();renderPlayoffsTab();}
 }
 
 function resetBracket(cls){
@@ -3675,15 +3607,15 @@ function resolveMatchTeams(cls,key,ri,mi){
     if(byeSeeds>0){
       const ft=slots.slice(byeSeeds);
       if(ri===0){
-        const pairs=[[ft[1]?.team||'TBD',ft[2]?.team||'TBD'],[ft[0]?.team||'TBD',ft[3]?.team||'TBD']]; // r0m0=8v9, r0m1=7v10
+        const pairs=[[ft[1]?.team||'TBD',ft[2]?.team||'TBD'],[ft[0]?.team||'TBD',ft[3]?.team||'TBD']];
         if(!st.top) topName=pairs[mi]?.[0]||'TBD';
         if(!st.bot) botName=pairs[mi]?.[1]||'TBD';
       } else if(ri===1){
-        const qfTops=[slots[0]?.team,slots[3]?.team,slots[2]?.team,slots[1]?.team]; // r1m0=#1, r1m1=#4, r1m2=#3, r1m3=#2
+        const qfTops=[slots[1]?.team,slots[3]?.team,slots[2]?.team,slots[0]?.team]; // r1m0=#2, r1m1=#4, r1m2=#3, r1m3=#1
         if(!st.top) topName=qfTops[mi]||'TBD';
         if(!st.bot){
-          if(mi===0){const fr=cfg.matchResults['r0m0']||{};botName=fr.winner==='top'?fr.top:fr.winner==='bot'?fr.bot:'FR Winner';} // #1 GC plays 8v9 (r0m0)
-          else if(mi===3){const fr=cfg.matchResults['r0m1']||{};botName=fr.winner==='top'?fr.top:fr.winner==='bot'?fr.bot:'FR Winner';} // #2 MH plays 7v10 (r0m1)
+          if(mi===0){const fr=cfg.matchResults['r0m0']||{};botName=fr.winner==='top'?fr.top:fr.winner==='bot'?fr.bot:'FR Winner';} // #2 MH plays 7v10 (r0m0)
+          else if(mi===3){const fr=cfg.matchResults['r0m1']||{};botName=fr.winner==='top'?fr.top:fr.winner==='bot'?fr.bot:'FR Winner';} // #1 GC plays 8v9 (r0m1)
           else botName=[slots[4]?.team,null,slots[5]?.team,null][mi]||'TBD';
         }
       } else {
@@ -3744,7 +3676,6 @@ function closePoScoreModal(){
 }
 
 function savePoScore(){
-  // Play-in scores are handled by savePlayinInline() — not this modal
   const {cls,key,ri,mi,topName,botName}=_poModal;
   if(!cls)return;
   const tsv=parseInt(document.getElementById('po-top-score').value);
@@ -3781,12 +3712,7 @@ function savePoScore(){
   showToast('✓ '+topName+' '+tsv+'–'+bsv+' '+botName+' — '+newWinner+' advances');
 }
 
-function savePlayinScore(){
-  // Legacy — no longer used, routing removed
-}
-
 function clearPoScore(){
-  // Play-in clearing handled by clearPlayinInline()
   const {cls,key,ri,mi}=_poModal;
   if(!cls||!confirm('Clear this result and retract the bracket from this point forward?'))return;
   initBrackets();
@@ -3809,57 +3735,10 @@ function clearPoScore(){
   showToast('✓ Result cleared — bracket retracted','tw');
 }
 
-function clearPlayinScore(){
-  const {cls}=_poModal;
-  if(!cls||!confirm('Clear the play-in result? The bracket slot will revert to TBA.'))return;
-  initBrackets();
-  const cfg=state.brackets[cls];
-  if(!cfg.playinMatch)return;
-  cfg.playinMatch.champScore=null;
-  cfg.playinMatch.oppScore=null;
-  cfg.playinMatch.winnerId=null;
-  // Revert the last bracket slot back to TBA
-  const size=cfg.slots&&cfg.slots.length;
-  if(size){
-    cfg.slots[size-1]={seed:size,team:'TBA — Play-In Winner',teamId:null,score:null,winner:false,isPlayinSlot:true};
-  }
-  // Clear any first-round matchResult that had the play-in winner seeded in
-  if(cfg.matchResults){
-    const order=size===8?[[0,7],[3,4],[2,5],[1,6]]:size===4?[[0,3],[1,2]]:[];
-    order.forEach(function([hi,lo],mi){
-      if(hi===size-1||lo===size-1){
-        const key='r0m'+mi;
-        const st=cfg.matchResults[key];
-        if(st&&!st.topScore&&!st.botScore){
-          if(hi===size-1) delete st.top; else delete st.bot;
-          if(!Object.keys(st).length) delete cfg.matchResults[key];
-        }
-      }
-    });
-  }
-  _bracketSaveTime=Date.now();
-  if(window._fbDB){
-    window._fbDB.ref('ncgl2026/brackets/'+cls).update({
-      playinMatch: cfg.playinMatch,
-      slots: cfg.slots,
-      matchResults: cfg.matchResults
-    }).catch(e=>saveState());
-  } else { saveState(); }
-  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
-  closePoScoreModal();
-  renderPlayoffsTab();
-  if(isAdmin&&document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active')) renderBracketAdminControls();
-  showToast('✓ Play-in result cleared','tw');
-}
-
 function openPlayinEdit(cls){
-  // Scroll admin to the playin score section in the bracket admin controls
   if(!isAdmin)return;
   switchAdminSub('playoffs',document.querySelector('.anb[onclick*="playoffs"]'));
-  setTimeout(()=>{
-    const el=document.getElementById('playin-score-'+cls);
-    if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
-  },200);
+  setTimeout(()=>{const el=document.getElementById('playin-score-'+cls);if(el) el.scrollIntoView({behavior:'smooth',block:'center'});},200);
 }
 
 function editPlayinInfo(){
@@ -3889,8 +3768,7 @@ function renderAll(){
     }
   }
   updateTitle();initSelects();
-  initBrackets();
-  renderPlayoffsTab();
+  renderPlayoffsTab(); // initBrackets called inside renderPlayoffsTab
 }
 
 // ── EXPORT CSV ────────────────────────────────────────────────────────────
@@ -4199,15 +4077,23 @@ if(isFirebaseConfigured){
         if(data.confRules){state.confRules=data.confRules;}
         if(data.standingsOverrides){state.standingsOverrides=data.standingsOverrides;}
         if(data.brackets){
-          // Always restore brackets from Firebase — this IS the source of truth.
-          // saveState() writes brackets there, so whatever is in Firebase is correct.
-          state.brackets=data.brackets;
-          // Ensure visible is always a strict boolean
-          ['A','B','C','D'].forEach(cls=>{
-            if(state.brackets[cls]&&state.brackets[cls].visible!==undefined){
-              state.brackets[cls].visible=state.brackets[cls].visible===true;
-            }
-          });
+          if(Date.now()-_bracketSaveTime < 3000){
+            // Within save protection window — restore matchResults and slots always,
+            // but skip restoring rounds/visible to avoid overwriting admin's just-saved date/venue
+            ['A','B','C','D'].forEach(cls=>{
+              if(data.brackets[cls]&&state.brackets[cls]){
+                // Always restore scores — never block these
+                if(data.brackets[cls].matchResults!==undefined) state.brackets[cls].matchResults=data.brackets[cls].matchResults||{};
+                if(data.brackets[cls].slots) state.brackets[cls].slots=data.brackets[cls].slots;
+                if(data.brackets[cls].playinMatch!==undefined) state.brackets[cls].playinMatch=data.brackets[cls].playinMatch;
+                // Always restore visible as strict boolean from Firebase
+                if(data.brackets[cls].visible!==undefined) state.brackets[cls].visible=data.brackets[cls].visible===true;
+              }
+            });
+          } else {
+            // Normal restore — take everything from Firebase
+            state.brackets=data.brackets;
+          }
         }
         if(data.messages) state.messages=data.messages;
                 // Clean up any stale zero-game archives (e.g. accidental 2027 archive)
@@ -4221,6 +4107,7 @@ if(isFirebaseConfigured){
         if(data.playinDate) state.playinDate=data.playinDate;
         if(data.playinVenue) state.playinVenue=data.playinVenue;
         try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+        _invalidateStandingsCache();
         renderAll();
         setFBBanner('connected');
         // If Firebase still has stale team classes, push the corrected data back up once
