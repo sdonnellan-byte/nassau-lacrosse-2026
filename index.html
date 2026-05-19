@@ -1449,16 +1449,16 @@ function populatePoMatchups(){
     if(byeSeeds>0){
       // Class B: First Round
       const ft=cfg.slots.slice(byeSeeds);
-      addMatch('r0m0',0,ft[1]?.team,ft[2]?.team); // 8v9
-      addMatch('r0m1',0,ft[0]?.team,ft[3]?.team); // 7v10
+      addMatch('r0m0',0,ft[1]?.team,ft[2]?.team); // 8v9 TOP -> plays #1 Garden City
+      addMatch('r0m1',0,ft[0]?.team,ft[3]?.team); // 7v10 BOT -> plays #2 Manhasset
       // QF
       const fr0=matchResults['r0m0']||{};const fr1=matchResults['r0m1']||{};
       const fr0w=fr0.winner==='top'?fr0.top:fr0.winner==='bot'?fr0.bot:null;
       const fr1w=fr1.winner==='top'?fr1.top:fr1.winner==='bot'?fr1.bot:null;
-      addMatch('r1m0',1,cfg.slots[1]?.team,fr0w||null); // #2 Manhasset vs 7v10 winner
+      addMatch('r1m0',1,cfg.slots[0]?.team,fr0w||null); // #1 Garden City vs 8v9 winner
       addMatch('r1m1',1,cfg.slots[3]?.team,cfg.slots[4]?.team);
       addMatch('r1m2',1,cfg.slots[2]?.team,cfg.slots[5]?.team);
-      addMatch('r1m3',1,cfg.slots[0]?.team,fr1w||null); // #1 Garden City vs 8v9 winner
+      addMatch('r1m3',1,cfg.slots[1]?.team,fr1w||null); // #2 Manhasset vs 7v10 winner
       // SF
       [[2,0,1],[2,1,2],[2,2,3]].forEach(([ri2,mi2])=>{
         const p1=matchResults[`r1m${mi2*2}`]||{};const p2=matchResults[`r1m${mi2*2+1}`]||{};
@@ -2643,12 +2643,12 @@ function renderGameDateOverrides(cls,cfg){
   const rounds2=cfg.rounds||DEFAULT_BRACKET_CONFIG[cls].rounds;
   const matchKeys=[];
   if(byeSeeds2>0){
-    matchKeys.push({key:'r0m0',ri:0,label:'First Round: #7 vs #10 (plays #2)'});
-    matchKeys.push({key:'r0m1',ri:0,label:'First Round: #8 vs #9 (plays #1)'});
-    matchKeys.push({key:'r1m0',ri:1,label:'QF: #2 vs FR Winner'});
+    matchKeys.push({key:'r0m0',ri:0,label:'First Round: #8 vs #9 (plays #1 Garden City)'});
+    matchKeys.push({key:'r0m1',ri:0,label:'First Round: #7 vs #10 (plays #2 Manhasset)' });
+    matchKeys.push({key:'r1m0',ri:1,label:'QF: #1 Garden City vs 8v9 Winner'});
     matchKeys.push({key:'r1m1',ri:1,label:'QF: #4 vs #5'});
     matchKeys.push({key:'r1m2',ri:1,label:'QF: #3 vs #6'});
-    matchKeys.push({key:'r1m3',ri:1,label:'QF: #1 vs FR Winner'});
+    matchKeys.push({key:'r1m3',ri:1,label:'QF: #2 Manhasset vs 7v10 Winner'});
     matchKeys.push({key:'r2m0',ri:2,label:'Semifinal 1'});
     matchKeys.push({key:'r2m1',ri:2,label:'Semifinal 2'});
     matchKeys.push({key:'r3m0',ri:3,label:'Final'});
@@ -2689,31 +2689,34 @@ function renderBracket(cls){
     // Class B special layout: render as custom HTML so FR games align visually with their QF opponent
     // 8v9 winner → plays #1 (top), 7v10 winner → plays #2 (bottom)
     const ft=slots.slice(byeSeeds); // [seed7, seed8, seed9, seed10]
-    const s710=[ft[0],ft[3]]; // #7 vs #10 (r0m0, TOP) -> winner plays #2 Manhasset
-    const s89=[ft[1],ft[2]];  // #8 vs #9  (r0m1, BOT) -> winner plays #1 Garden City
-    const fr0=cfg.matchResults['r0m0']||{}; // 7v10 result (top FR game)
-    const fr1=cfg.matchResults['r0m1']||{}; // 8v9 result  (bot FR game)
+    const s89=[ft[1],ft[2]];   // #8 vs #9  (r0m0, TOP FR) -> winner plays #1 Garden City
+    const s710=[ft[0],ft[3]];  // #7 vs #10 (r0m1, BOT FR) -> winner plays #2 Manhasset
+    const fr0=cfg.matchResults['r0m0']||{}; // 8v9  result (top FR game)
+    const fr1=cfg.matchResults['r0m1']||{}; // 7v10 result (bot FR game)
     const fr0winner=fr0.winner==='top'?fr0.top:fr0.winner==='bot'?fr0.bot:'TBA';
     const fr1winner=fr1.winner==='top'?fr1.top:fr1.winner==='bot'?fr1.bot:'TBA';
 
-    // QF: TOP: #2 Manhasset vs 7v10 winner | BOT: #1 Garden City vs 8v9 winner
+    // QF layout (top to bottom):
+    // r1m0: #1 Garden City (slots[0]) vs 8v9 winner  -> SF top half
+    // r1m1: #4 (slots[3])             vs #5 (slots[4])
+    // r1m2: #3 (slots[2])             vs #6 (slots[5])
+    // r1m3: #2 Manhasset (slots[1])   vs 7v10 winner -> SF bottom half
     const qf=[
-      {key:'r1m0',top:{seed:slots[1]?.seed,team:slots[1]?.team||'TBD'},bot:{seed:'',team:fr0winner!=='TBA'?fr0winner:'TBA — 7v10 Winner'},frGame:'top'},
+      {key:'r1m0',top:{seed:slots[0]?.seed,team:slots[0]?.team||'TBD'},bot:{seed:'',team:fr0winner!=='TBA'?fr0winner:'TBA — 8v9 Winner'},frGame:'top'},
       {key:'r1m1',top:{seed:slots[3]?.seed,team:slots[3]?.team||'TBD'},bot:{seed:slots[4]?.seed,team:slots[4]?.team||'TBD'},frGame:null},
       {key:'r1m2',top:{seed:slots[2]?.seed,team:slots[2]?.team||'TBD'},bot:{seed:slots[5]?.seed,team:slots[5]?.team||'TBD'},frGame:null},
-      {key:'r1m3',top:{seed:slots[0]?.seed,team:slots[0]?.team||'TBD'},bot:{seed:'',team:fr1winner!=='TBA'?fr1winner:'TBA — 8v9 Winner'},frGame:'bot'},
+      {key:'r1m3',top:{seed:slots[1]?.seed,team:slots[1]?.team||'TBD'},bot:{seed:'',team:fr1winner!=='TBA'?fr1winner:'TBA — 7v10 Winner'},frGame:'bot'},
     ];
-    // Override with stored QF results if present
+    // Overlay stored QF scores/winners — but NEVER override the seeded team name
+    // (only override if score exists, to prevent winner-advance from corrupting seed display)
     qf.forEach(qm=>{
       const st=cfg.matchResults[qm.key]||{};
-      if(st.top){qm.top={...qm.top,team:st.top,score:st.topScore??null,winner:st.winner==='top'};}
-      if(st.bot){
-        // Only override bot if it has an actual team (don't overwrite TBA with empty)
-        const newBot={...qm.bot,team:st.bot,score:st.botScore??null,winner:st.winner==='bot'};
-        qm.bot=newBot;
-      }
-      if(st.winner==='top') qm.top.winner=true;
-      if(st.winner==='bot') qm.bot.winner=true;
+      if(st.topScore!=null){qm.top={...qm.top,score:st.topScore,winner:st.winner==='top'};}
+      if(st.botScore!=null){qm.bot={...qm.bot,score:st.botScore,winner:st.winner==='bot'};}
+      // Only update team name from stored result if it matches what we expect
+      // (prevents corrupted matchResults from overwriting seeds)
+      if(st.winner==='top'&&st.top) qm.top={...qm.top,team:st.top,winner:true};
+      if(st.winner==='bot'&&st.bot) qm.bot={...qm.bot,team:st.bot,winner:true};
     });
 
     // SF
@@ -2755,13 +2758,13 @@ function renderBracket(cls){
       <div style="display:flex;flex-direction:column;height:100%;justify-content:space-between;padding:6px 6px">`;
     // 8v9 at top
     html+=`<div class="bracket-match" style="margin-bottom:0">`;
-    html+=mkFRSlot({seed:s710[0]?.seed,team:s710[0]?.team||'TBD',score:fr0.topScore??null,winner:fr0.winner==='top'},'r0m0',0,0);
-    html+=mkFRSlot({seed:s710[1]?.seed,team:s710[1]?.team||'TBD',score:fr0.botScore??null,winner:fr0.winner==='bot'},'r0m0',0,0);
+    html+=mkFRSlot({seed:s89[0]?.seed,team:s89[0]?.team||'TBD',score:fr0.topScore??null,winner:fr0.winner==='top'},'r0m0',0,0);
+    html+=mkFRSlot({seed:s89[1]?.seed,team:s89[1]?.team||'TBD',score:fr0.botScore??null,winner:fr0.winner==='bot'},'r0m0',0,0);
     html+=`</div>`;
     html+=`<div style="flex:1"></div>`;
     html+=`<div class="bracket-match" style="margin-top:0">`;
-    html+=mkFRSlot({seed:s89[0]?.seed,team:s89[0]?.team||'TBD',score:fr1.topScore??null,winner:fr1.winner==='top'},'r0m1',0,1);
-    html+=mkFRSlot({seed:s89[1]?.seed,team:s89[1]?.team||'TBD',score:fr1.botScore??null,winner:fr1.winner==='bot'},'r0m1',0,1);
+    html+=mkFRSlot({seed:s710[0]?.seed,team:s710[0]?.team||'TBD',score:fr1.topScore??null,winner:fr1.winner==='top'},'r0m1',0,1);
+    html+=mkFRSlot({seed:s710[1]?.seed,team:s710[1]?.team||'TBD',score:fr1.botScore??null,winner:fr1.winner==='bot'},'r0m1',0,1);
     html+=`</div>`;
     html+=`</div></div>`;
 
@@ -3611,11 +3614,11 @@ function resolveMatchTeams(cls,key,ri,mi){
         if(!st.top) topName=pairs[mi]?.[0]||'TBD';
         if(!st.bot) botName=pairs[mi]?.[1]||'TBD';
       } else if(ri===1){
-        const qfTops=[slots[1]?.team,slots[3]?.team,slots[2]?.team,slots[0]?.team]; // r1m0=#2, r1m1=#4, r1m2=#3, r1m3=#1
+        const qfTops=[slots[0]?.team,slots[3]?.team,slots[2]?.team,slots[1]?.team]; // r1m0=#1, r1m1=#4, r1m2=#3, r1m3=#2
         if(!st.top) topName=qfTops[mi]||'TBD';
         if(!st.bot){
-          if(mi===0){const fr=cfg.matchResults['r0m0']||{};botName=fr.winner==='top'?fr.top:fr.winner==='bot'?fr.bot:'FR Winner';} // #2 MH plays 7v10 (r0m0)
-          else if(mi===3){const fr=cfg.matchResults['r0m1']||{};botName=fr.winner==='top'?fr.top:fr.winner==='bot'?fr.bot:'FR Winner';} // #1 GC plays 8v9 (r0m1)
+          if(mi===0){const fr=cfg.matchResults['r0m0']||{};botName=fr.winner==='top'?fr.top:fr.winner==='bot'?fr.bot:'FR Winner';} // #1 GC plays 8v9 winner (r0m0)
+          else if(mi===3){const fr=cfg.matchResults['r0m1']||{};botName=fr.winner==='top'?fr.top:fr.winner==='bot'?fr.bot:'FR Winner';} // #2 MH plays 7v10 winner (r0m1)
           else botName=[slots[4]?.team,null,slots[5]?.team,null][mi]||'TBD';
         }
       } else {
