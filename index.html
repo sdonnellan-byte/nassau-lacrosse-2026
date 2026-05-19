@@ -2796,9 +2796,9 @@ function renderBracket(cls){
     html+=`<div style="display:flex;align-items:center;width:14px;flex-shrink:0"></div>`;
 
     // SF column
-    const sfInfo=rInfo[2]||{name:'Semifinals',date:'',venue:''};
+    const sfInfo=rInfo[2]||{name:'Semifinals',date:'',venue:'',time:''};
     html+=`<div style="display:flex;flex-direction:column;min-width:180px;flex-shrink:0">
-      <div style="${roundTitleStyle}">${sfInfo.name}<br><small style="font-size:10px;font-weight:400">${sfInfo.date||''}</small><br><small style="font-size:10px;color:var(--blue-lt)">${sfInfo.venue||''}</small></div>
+      <div style="${roundTitleStyle}">${sfInfo.name}<br><small style="font-size:10px;font-weight:400">${sfInfo.date||''}${sfInfo.time?' · <strong>'+sfInfo.time+'</strong>':''}</small><br><small style="font-size:10px;color:var(--blue-lt)">${sfInfo.venue||''}</small></div>
       <div style="display:flex;flex-direction:column;justify-content:space-around;flex:1;padding:6px 6px;gap:6px">`;
     [[sf0,'r2m0',2,0],[sf1,'r2m1',2,1]].forEach(([st,key,ri,mi])=>{
       html+=`<div class="bracket-match">`;
@@ -2812,10 +2812,10 @@ function renderBracket(cls){
     html+=`<div style="display:flex;align-items:center;width:14px;flex-shrink:0"></div>`;
 
     // Finals column
-    const finInfo=rInfo[3]||{name:'Finals',date:'',venue:''};
+    const finInfo=rInfo[3]||{name:'Finals',date:'',venue:'',time:''};
     const champKey='r3m0';
     html+=`<div style="display:flex;flex-direction:column;min-width:180px;flex-shrink:0">
-      <div style="${roundTitleStyle}">${finInfo.name}<br><small style="font-size:10px;font-weight:400">${finInfo.date||''}</small><br><small style="font-size:10px;color:var(--blue-lt)">${finInfo.venue||''}</small></div>
+      <div style="${roundTitleStyle}">${finInfo.name}<br><small style="font-size:10px;font-weight:400">${finInfo.date||''}${finInfo.time?' · <strong>'+finInfo.time+'</strong>':''}</small><br><small style="font-size:10px;color:var(--blue-lt)">${finInfo.venue||''}</small></div>
       <div style="display:flex;flex-direction:column;justify-content:center;flex:1;padding:6px 6px">
         <div class="bracket-match final">`;
     html+=mkSlot({team:fin.top||'TBD',score:fin.topScore??null,winner:fin.winner==='top'},champKey,3,0);
@@ -2907,7 +2907,7 @@ function renderBracket(cls){
     const rInfo=rounds[ri]||{name:`Round ${ri+1}`,date:'',venue:''};
     const isFinal=ri===numRounds-1;
     html+=`<div class="bracket-round">
-      <div class="bracket-round-title">${rInfo.name}<small>${rInfo.date||''}</small><small style="color:var(--blue-lt)">${rInfo.venue||''}</small></div>`;
+      <div class="bracket-round-title">${rInfo.name}<small>${rInfo.date||''}${rInfo.time?' · '+rInfo.time:''}</small><small style="color:var(--blue-lt)">${rInfo.venue||''}</small></div>`;
     rnd.forEach((pair,mi)=>{
       const key=`r${ri}m${mi}`;
       const gdv=getGameDateVenue(cfg,key,ri);
@@ -3500,8 +3500,11 @@ function editRoundInfo(cls,ri){
   if(newDate===null)return;
   const newVenue=prompt(`${r.name} — Venue:`,r.venue||'');
   if(newVenue===null)return;
+  const newTime=prompt(`${r.name} — Time (e.g. 4:00 PM, clear to remove):`,r.time||'');
+  if(newTime===null)return;
   cfg.rounds[ri].date=newDate.trim();
   cfg.rounds[ri].venue=newVenue.trim();
+  cfg.rounds[ri].time=newTime.trim();
   // Write ONLY the rounds array for this class directly to Firebase
   // This avoids the full saveState() race condition
   _bracketSaveTime=Date.now();
