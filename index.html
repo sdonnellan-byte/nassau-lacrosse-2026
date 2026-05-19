@@ -3604,45 +3604,51 @@ function resolveMatchTeams(cls,key,ri,mi){
   const st=(cfg.matchResults&&cfg.matchResults[key])||{};
   const slots=cfg.slots||[];
   const byeSeeds=cfg.byeSeeds||(DEFAULT_BRACKET_CONFIG[cls]&&DEFAULT_BRACKET_CONFIG[cls].byeSeeds)||0;
-  let topName=st.top||'TBD';
-  let botName=st.bot||'TBD';
-  if(!st.top||!st.bot){
-    if(byeSeeds>0){
-      const ft=slots.slice(byeSeeds);
-      if(ri===0){
-        const pairs=[[ft[1]?.team||'TBD',ft[2]?.team||'TBD'],[ft[0]?.team||'TBD',ft[3]?.team||'TBD']];
-        if(!st.top) topName=pairs[mi]?.[0]||'TBD';
-        if(!st.bot) botName=pairs[mi]?.[1]||'TBD';
-      } else if(ri===1){
-        const qfTops=[slots[0]?.team,slots[3]?.team,slots[2]?.team,slots[1]?.team]; // r1m0=#1, r1m1=#4, r1m2=#3, r1m3=#2
-        if(!st.top) topName=qfTops[mi]||'TBD';
-        if(!st.bot){
-          if(mi===0){const fr=cfg.matchResults['r0m0']||{};botName=fr.winner==='top'?fr.top:fr.winner==='bot'?fr.bot:'FR Winner';} // #1 GC plays 8v9 winner (r0m0)
-          else if(mi===3){const fr=cfg.matchResults['r0m1']||{};botName=fr.winner==='top'?fr.top:fr.winner==='bot'?fr.bot:'FR Winner';} // #2 MH plays 7v10 winner (r0m1)
-          else botName=[slots[4]?.team,null,slots[5]?.team,null][mi]||'TBD';
-        }
-      } else {
-        const p1=cfg.matchResults[`r${ri-1}m${mi*2}`]||{};
-        const p2=cfg.matchResults[`r${ri-1}m${mi*2+1}`]||{};
-        if(!st.top) topName=p1.winner==='top'?p1.top:p1.winner==='bot'?p1.bot:'TBD';
-        if(!st.bot) botName=p2.winner==='top'?p2.top:p2.winner==='bot'?p2.bot:'TBD';
+  let topName='TBD';
+  let botName='TBD';
+  if(byeSeeds>0){
+    const ft=slots.slice(byeSeeds);
+    if(ri===0){
+      // FR games: r0m0=8v9 (TOP), r0m1=7v10 (BOT)
+      if(mi===0){topName=ft[1]?.team||'TBD';botName=ft[2]?.team||'TBD';} // 8v9
+      else{topName=ft[0]?.team||'TBD';botName=ft[3]?.team||'TBD';} // 7v10
+    } else if(ri===1){
+      // QF: always use slots for seeded teams, matchResults for FR winners
+      const qfTopSlots=[0,3,2,1]; // r1m0=#1(slots[0]), r1m1=#4, r1m2=#3, r1m3=#2(slots[1])
+      topName=slots[qfTopSlots[mi]]?.team||'TBD';
+      if(mi===0){
+        const fr=cfg.matchResults['r0m0']||{};
+        botName=fr.winner==='top'?fr.top:fr.winner==='bot'?fr.bot:'8v9 FR Winner';
+      } else if(mi===1){
+        botName=slots[4]?.team||'TBD'; // #5 seed
+      } else if(mi===2){
+        botName=slots[5]?.team||'TBD'; // #6 seed
+      } else { // mi===3
+        const fr=cfg.matchResults['r0m1']||{};
+        botName=fr.winner==='top'?fr.top:fr.winner==='bot'?fr.bot:'7v10 FR Winner';
       }
     } else {
-      if(ri===0){
-        const size=slots.length;
-        let order=[];
-        if(size===8) order=[[0,7],[3,4],[2,5],[1,6]];
-        else if(size===4) order=[[0,3],[1,2]];
-        else{const h=Math.ceil(size/2);for(let i=0;i<h;i++) order.push([i,size-1-i]);}
-        const pair=order[mi]||[mi,size-1-mi];
-        if(!st.top) topName=slots[pair[0]]?.team||'TBD';
-        if(!st.bot) botName=slots[pair[1]]?.team||'TBD';
-      } else {
-        const p1=cfg.matchResults[`r${ri-1}m${mi*2}`]||{};
-        const p2=cfg.matchResults[`r${ri-1}m${mi*2+1}`]||{};
-        if(!st.top) topName=p1.winner==='top'?p1.top:p1.winner==='bot'?p1.bot:'TBD';
-        if(!st.bot) botName=p2.winner==='top'?p2.top:p2.winner==='bot'?p2.bot:'TBD';
-      }
+      // SF and beyond: use previous round winners
+      const p1=cfg.matchResults[`r${ri-1}m${mi*2}`]||{};
+      const p2=cfg.matchResults[`r${ri-1}m${mi*2+1}`]||{};
+      topName=p1.winner==='top'?p1.top:p1.winner==='bot'?p1.bot:'TBD';
+      botName=p2.winner==='top'?p2.top:p2.winner==='bot'?p2.bot:'TBD';
+    }
+  } else {
+    if(ri===0){
+      const size=slots.length;
+      let order=[];
+      if(size===8) order=[[0,7],[3,4],[2,5],[1,6]];
+      else if(size===4) order=[[0,3],[1,2]];
+      else{const h=Math.ceil(size/2);for(let i=0;i<h;i++) order.push([i,size-1-i]);}
+      const pair=order[mi]||[mi,size-1-mi];
+      topName=slots[pair[0]]?.team||'TBD';
+      botName=slots[pair[1]]?.team||'TBD';
+    } else {
+      const p1=cfg.matchResults[`r${ri-1}m${mi*2}`]||{};
+      const p2=cfg.matchResults[`r${ri-1}m${mi*2+1}`]||{};
+      topName=p1.winner==='top'?p1.top:p1.winner==='bot'?p1.bot:'TBD';
+      botName=p2.winner==='top'?p2.top:p2.winner==='bot'?p2.bot:'TBD';
     }
   }
   return{topName,botName,st};
