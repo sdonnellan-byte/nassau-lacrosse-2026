@@ -2517,8 +2517,7 @@ function getConf4QualifiersForClass(cls){
 
 function _autoSyncBracket(cls){
   // Silently sync seeds from current standings without wiping entered match results
-  // Called automatically whenever admin opens the playoffs tab
-  initBrackets();
+  if(!state.brackets||!state.brackets[cls])return;
   const seeds=getBracketSeeds(cls);
   const cfg=state.brackets[cls];
   const size=cfg.size||(PLAYOFF_SPOTS[cls]||8);
@@ -2605,7 +2604,12 @@ function getGameDateVenue(cfg,key,ri){
   const st=(cfg.matchResults&&cfg.matchResults[key])||{};
   const rounds=cfg.rounds||[];
   const roundInfo=rounds[ri]||{};
-  return{date:st.dateOverride!==undefined?st.dateOverride:(roundInfo.date||''),venue:st.venueOverride!==undefined?st.venueOverride:(roundInfo.venue||''),hasOverride:st.dateOverride!==undefined||st.venueOverride!==undefined};
+  return{
+    date:st.dateOverride!==undefined?st.dateOverride:(roundInfo.date||''),
+    venue:st.venueOverride!==undefined?st.venueOverride:(roundInfo.venue||''),
+    time:st.timeOverride!==undefined?st.timeOverride:'',
+    hasOverride:st.dateOverride!==undefined||st.venueOverride!==undefined||st.timeOverride!==undefined
+  };
 }
 
 function editGameDate(cls,key,ri){
@@ -2619,12 +2623,16 @@ function editGameDate(cls,key,ri){
   const roundDefault=rounds[ri]||{};
   const currentDate=st.dateOverride!==undefined?st.dateOverride:(roundDefault.date||'');
   const currentVenue=st.venueOverride!==undefined?st.venueOverride:(roundDefault.venue||'');
+  const currentTime=st.timeOverride!==undefined?st.timeOverride:'';
   const newDate=prompt('Game date (clear to revert to round default):',currentDate);
   if(newDate===null)return;
   const newVenue=prompt('Game venue (clear to revert to round default):',currentVenue);
   if(newVenue===null)return;
+  const newTime=prompt('Game time e.g. 4:00 PM (clear to remove):',currentTime);
+  if(newTime===null)return;
   if(newDate.trim()===''){delete st.dateOverride;}else{st.dateOverride=newDate.trim();}
   if(newVenue.trim()===''){delete st.venueOverride;}else{st.venueOverride=newVenue.trim();}
+  if(newTime.trim()===''){delete st.timeOverride;}else{st.timeOverride=newTime.trim();}
   if(!Object.keys(st).length) delete cfg.matchResults[key];
   _bracketSaveTime=Date.now();
   if(window._fbDB){
@@ -2662,10 +2670,11 @@ function renderGameDateOverrides(cls,cfg){
       for(let m2=0;m2<cnt2;m2++) matchKeys.push({key:'r'+r2+'m'+m2,ri:r2,label:(rounds2[r2]&&rounds2[r2].name||'Round '+(r2+1))+' Game '+(m2+1)});
     }
   }
-  let out='<div style="margin-top:12px;margin-bottom:4px"><div style="font-size:11px;color:var(--gray);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;font-weight:700">Per-Game Date/Venue Overrides</div><div style="font-size:10px;color:var(--text-dim);margin-bottom:7px">Set a custom date or venue for any game. Gold = override active.</div>';
+  let out='<div style="margin-top:12px;margin-bottom:4px"><div style="font-size:11px;color:var(--gray);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;font-weight:700">Per-Game Date, Time &amp; Venue</div><div style="font-size:10px;color:var(--text-dim);margin-bottom:7px">Set a custom date, time, or venue per game. Gold = override active.</div>';
   matchKeys.forEach(function(mk){
     const gdv=getGameDateVenue(cfg,mk.key,mk.ri);
-    const ovHtml=gdv.hasOverride?('<span style="color:var(--gold);font-size:10px">'+gdv.date+(gdv.venue?' · '+gdv.venue:'')+'</span>'):'<span style="color:var(--border);font-size:10px">round default</span>';
+    const ovParts=[];if(gdv.date)ovParts.push(gdv.date);if(gdv.time)ovParts.push(gdv.time);if(gdv.venue)ovParts.push(gdv.venue);
+    const ovHtml=gdv.hasOverride?('<span style="color:var(--gold);font-size:10px">'+ovParts.join(' · ')+'</span>'):'<span style="color:var(--border);font-size:10px">round default</span>';
     out+='<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--navy);border-radius:6px;margin-bottom:3px;font-size:11px"><span style="flex:1;color:var(--text-dim)">'+mk.label+'</span>'+ovHtml+'<button data-cls="'+cls+'" data-key="'+mk.key+'" data-ri="'+mk.ri+'" onclick="editGameDate(this.dataset.cls,this.dataset.key,parseInt(this.dataset.ri))" style="background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-size:10px;color:var(--gray);padding:1px 6px">&#128197; Edit</button></div>';
   });
   out+='</div>';
@@ -2673,9 +2682,8 @@ function renderGameDateOverrides(cls,cfg){
 }
 
 function renderBracket(cls){
-  initBrackets();
+  if(!state.brackets||!state.brackets[cls]) return'';
   const cfg=state.brackets[cls];
-  if(!cfg) return'';
   const slots=cfg.slots||[];
   const rounds=cfg.rounds||DEFAULT_BRACKET_CONFIG[cls].rounds;
   if(!cfg.matchResults) cfg.matchResults={};
@@ -2920,7 +2928,13 @@ function renderBracket(cls){
         </div>`;
       });
       html+=`</div>`;
-      if(gdv.date||gdv.venue){const dc=gdv.hasOverride?'var(--gold)':'var(--text-dim)';html+=`<div style="font-size:10px;text-align:center;padding:1px 6px 5px;line-height:1.5"><span style="color:${dc}">${gdv.date}</span>${gdv.date&&gdv.venue?`<span style="color:var(--border)"> · </span>`:``}${gdv.venue?`<span style="color:var(--blue-lt)">${gdv.venue}</span>`:``}</div>`;}
+      if(gdv.date||gdv.venue||gdv.time){
+        const dc=gdv.hasOverride?'var(--gold)':'var(--text-dim)';
+        const timePart=gdv.time?`<span style="color:var(--gold);font-weight:700"> ${gdv.time}</span>`:'';
+        const venuePart=gdv.venue?`<span style="color:var(--blue-lt)">${gdv.venue}</span>`:'';
+        const sep=(gdv.date||gdv.time)&&gdv.venue?`<span style="color:var(--border)"> · </span>`:'';
+        html+=`<div style="font-size:10px;text-align:center;padding:1px 6px 5px;line-height:1.6"><span style="color:${dc}">${gdv.date}</span>${timePart}${sep}${venuePart}</div>`;
+      }
     });
     html+=`</div>`;
     if(ri<numRounds-1) html+=`<div style="display:flex;align-items:center;width:14px;flex-shrink:0"></div>`;
@@ -3664,10 +3678,16 @@ function openMatchEdit(cls,key,ri,mi){
   const roundInfo=rounds[ri]||{};
   const matchSt=cfg.matchResults[key]||{};
   const displayDate=matchSt.dateOverride!==undefined?matchSt.dateOverride:(roundInfo.date||'');
+  const displayTime=matchSt.timeOverride||'';
+  const displayVenue=matchSt.venueOverride!==undefined?matchSt.venueOverride:(roundInfo.venue||'');
   _poModal={cls,key,ri,mi,topName,botName,isPlayin:false};
   const clsLabel={A:'Class A',B:'Class B',C:'Class C',D:'Class D'}[cls]||'Class '+cls;
   document.getElementById('po-score-title').textContent='🥍 '+clsLabel+' Playoffs';
-  document.getElementById('po-score-round').textContent=(roundInfo.name||'Round '+(ri+1))+(displayDate?' · '+displayDate:'');
+  const roundParts=[roundInfo.name||'Round '+(ri+1)];
+  if(displayDate) roundParts.push(displayDate);
+  if(displayTime) roundParts.push(displayTime);
+  if(displayVenue) roundParts.push(displayVenue);
+  document.getElementById('po-score-round').textContent=roundParts.join(' · ');
   document.getElementById('po-top-lbl').textContent=topName;
   document.getElementById('po-bot-lbl').textContent=botName;
   document.getElementById('po-score-err').style.display='none';
@@ -3705,6 +3725,7 @@ function savePoScore(){
   const preserved={};
   if(st.dateOverride!==undefined) preserved.dateOverride=st.dateOverride;
   if(st.venueOverride!==undefined) preserved.venueOverride=st.venueOverride;
+  if(st.timeOverride!==undefined) preserved.timeOverride=st.timeOverride;
   cfg.matchResults[key]={...preserved,top:topName,bot:botName,topScore:tsv,botScore:bsv,winner};
   const nk=`r${ri+1}m${Math.floor(mi/2)}`;
   const slot=mi%2===0?'top':'bot';
@@ -3730,6 +3751,7 @@ function clearPoScore(){
   const preserved={};
   if(st.dateOverride!==undefined) preserved.dateOverride=st.dateOverride;
   if(st.venueOverride!==undefined) preserved.venueOverride=st.venueOverride;
+  if(st.timeOverride!==undefined) preserved.timeOverride=st.timeOverride;
   delete cfg.matchResults[key];
   if(Object.keys(preserved).length) cfg.matchResults[key]=preserved;
   clearMatchCascade(cls,ri,mi);
