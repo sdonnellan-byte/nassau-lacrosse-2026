@@ -2607,7 +2607,7 @@ function getGameDateVenue(cfg,key,ri){
   return{
     date:st.dateOverride!==undefined?st.dateOverride:(roundInfo.date||''),
     venue:st.venueOverride!==undefined?st.venueOverride:(roundInfo.venue||''),
-    time:st.timeOverride!==undefined?st.timeOverride:'',
+    time:st.timeOverride!==undefined?st.timeOverride:(roundInfo.time||''),
     hasOverride:st.dateOverride!==undefined||st.venueOverride!==undefined||st.timeOverride!==undefined
   };
 }
@@ -2785,10 +2785,20 @@ function renderBracket(cls){
       <div style="${roundTitleStyle}">${qfInfo.name}<br><small style="font-size:10px;font-weight:400">${qfInfo.date||''}</small><br><small style="font-size:10px;color:var(--blue-lt)">${qfInfo.venue||''}</small></div>
       <div style="display:flex;flex-direction:column;justify-content:space-around;flex:1;padding:6px 6px;gap:6px">`;
     qf.forEach((qm,mi)=>{
+      const qgdv=getGameDateVenue(cfg,qm.key,1);
       html+=`<div class="bracket-match">`;
       html+=mkSlot({...qm.top},qm.key,1,mi);
       html+=mkSlot({...qm.bot},qm.key,1,mi);
       html+=`</div>`;
+      if(qgdv.date||qgdv.time||qgdv.venue){
+        const qdc=qgdv.hasOverride?'var(--gold)':'var(--text-dim)';
+        html+=`<div style="font-size:10px;text-align:center;padding:2px 6px 5px;line-height:1.6">`;
+        if(qgdv.date) html+=`<span style="color:${qdc}">${qgdv.date}</span>`;
+        if(qgdv.time) html+=`<span style="color:var(--gold);font-weight:700"> ${qgdv.time}</span>`;
+        if((qgdv.date||qgdv.time)&&qgdv.venue) html+=`<span style="color:var(--border)"> · </span>`;
+        if(qgdv.venue) html+=`<span style="color:var(--blue-lt)">${qgdv.venue}</span>`;
+        html+=`</div>`;
+      }
     });
     html+=`</div></div>`;
 
@@ -2798,13 +2808,23 @@ function renderBracket(cls){
     // SF column
     const sfInfo=rInfo[2]||{name:'Semifinals',date:'',venue:'',time:''};
     html+=`<div style="display:flex;flex-direction:column;min-width:180px;flex-shrink:0">
-      <div style="${roundTitleStyle}">${sfInfo.name}<br><small style="font-size:10px;font-weight:400">${sfInfo.date||''}${sfInfo.time?' · <strong>'+sfInfo.time+'</strong>':''}</small><br><small style="font-size:10px;color:var(--blue-lt)">${sfInfo.venue||''}</small></div>
+      <div style="${roundTitleStyle}">${sfInfo.name}<br><small style="font-size:10px;font-weight:400">${sfInfo.date||''}${sfInfo.time?' <strong>'+sfInfo.time+'</strong>':''}</small><br><small style="font-size:10px;color:var(--blue-lt)">${sfInfo.venue||''}</small></div>
       <div style="display:flex;flex-direction:column;justify-content:space-around;flex:1;padding:6px 6px;gap:6px">`;
     [[sf0,'r2m0',2,0],[sf1,'r2m1',2,1]].forEach(([st,key,ri,mi])=>{
+      const sgdv=getGameDateVenue(cfg,key,ri);
       html+=`<div class="bracket-match">`;
       html+=mkSlot({team:st.top||'TBD',score:st.topScore??null,winner:st.winner==='top'},key,ri,mi);
       html+=mkSlot({team:st.bot||'TBD',score:st.botScore??null,winner:st.winner==='bot'},key,ri,mi);
       html+=`</div>`;
+      if(sgdv.date||sgdv.time||sgdv.venue){
+        const sdc=sgdv.hasOverride?'var(--gold)':'var(--text-dim)';
+        html+=`<div style="font-size:10px;text-align:center;padding:2px 6px 6px;line-height:1.6">`;
+        if(sgdv.date) html+=`<span style="color:${sdc}">${sgdv.date}</span>`;
+        if(sgdv.time) html+=`<span style="color:var(--gold);font-weight:700"> ${sgdv.time}</span>`;
+        if((sgdv.date||sgdv.time)&&sgdv.venue) html+=`<span style="color:var(--border)"> · </span>`;
+        if(sgdv.venue) html+=`<span style="color:var(--blue-lt)">${sgdv.venue}</span>`;
+        html+=`</div>`;
+      }
     });
     html+=`</div></div>`;
 
@@ -2815,12 +2835,23 @@ function renderBracket(cls){
     const finInfo=rInfo[3]||{name:'Finals',date:'',venue:'',time:''};
     const champKey='r3m0';
     html+=`<div style="display:flex;flex-direction:column;min-width:180px;flex-shrink:0">
-      <div style="${roundTitleStyle}">${finInfo.name}<br><small style="font-size:10px;font-weight:400">${finInfo.date||''}${finInfo.time?' · <strong>'+finInfo.time+'</strong>':''}</small><br><small style="font-size:10px;color:var(--blue-lt)">${finInfo.venue||''}</small></div>
+      <div style="${roundTitleStyle}">${finInfo.name}<br><small style="font-size:10px;font-weight:400">${finInfo.date||''}${finInfo.time?' <strong>'+finInfo.time+'</strong>':''}</small><br><small style="font-size:10px;color:var(--blue-lt)">${finInfo.venue||''}</small></div>
       <div style="display:flex;flex-direction:column;justify-content:center;flex:1;padding:6px 6px">
         <div class="bracket-match final">`;
     html+=mkSlot({team:fin.top||'TBD',score:fin.topScore??null,winner:fin.winner==='top'},champKey,3,0);
     html+=mkSlot({team:fin.bot||'TBD',score:fin.botScore??null,winner:fin.winner==='bot'},champKey,3,0);
-    html+=`</div></div></div>`;
+    html+=`</div>`;
+    const fgdv=getGameDateVenue(cfg,champKey,3);
+    if(fgdv.date||fgdv.time||fgdv.venue){
+      const fdc=fgdv.hasOverride?'var(--gold)':'var(--text-dim)';
+      html+=`<div style="font-size:10px;text-align:center;padding:2px 6px 6px;line-height:1.6">`;
+      if(fgdv.date) html+=`<span style="color:${fdc}">${fgdv.date}</span>`;
+      if(fgdv.time) html+=`<span style="color:var(--gold);font-weight:700"> ${fgdv.time}</span>`;
+      if((fgdv.date||fgdv.time)&&fgdv.venue) html+=`<span style="color:var(--border)"> · </span>`;
+      if(fgdv.venue) html+=`<span style="color:var(--blue-lt)">${fgdv.venue}</span>`;
+      html+=`</div>`;
+    }
+    html+=`</div></div>`;
 
     // Champion
     const champName=fin.winner==='top'?fin.top:fin.winner==='bot'?fin.bot:'';
