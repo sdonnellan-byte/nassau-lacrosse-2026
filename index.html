@@ -350,6 +350,7 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
     <button class="fbtn" onclick="filterSched('all',this)">All</button>
     <button class="fbtn active" onclick="filterSched('pending',this)">Unplayed</button>
     <button class="fbtn" onclick="filterSched('played',this)">Played</button>
+    <button class="fbtn" onclick="filterSched('playoffs',this)" id="sched-po-btn" style="display:none">🥍 Playoffs</button>
   </div>
   <div style="margin:8px 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
     <label style="font-size:12px;color:var(--gray);font-weight:600;white-space:nowrap">🔍 Jump to Team:</label>
@@ -361,6 +362,7 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
   </div>
   <div class="ebar"><button class="btn btn-ol btn-sm" onclick="exportCSV('schedule')">📊 Export to Google Sheets</button></div>
   <div id="sched-list"></div>
+  <div id="sched-playoffs" style="display:none"></div>
 </div>
 
 <!-- RECENT RESULTS (public) -->
@@ -917,6 +919,17 @@ function safeGames(){return state.games||[];}
 function safeTM(id){return TM[id]||{name:id||'Unknown',conf:0,cls:'?',id:id};}
 
 // ── TITLE ──────────────────────────────────────────────────────────────────
+function updateSchedPlayoffsBtn(){
+  const btn=document.getElementById('sched-po-btn');
+  if(!btn) return;
+  const anyResults=['A','B','C','D'].some(cls=>{
+    const cfg=state.brackets&&state.brackets[cls];
+    if(!cfg||!cfg.matchResults) return false;
+    return Object.values(cfg.matchResults).some(st=>st&&st.topScore!=null&&st.botScore!=null);
+  });
+  btn.style.display=anyResults?'':'none';
+}
+
 function updateTitle(){
   const y=state.year||2026;
   document.getElementById('title-year').textContent=y;
@@ -2182,8 +2195,80 @@ function filterSched(f,el){
   schedFilter=f;
   document.querySelectorAll('#sched-fbar .fbtn').forEach(b=>b.classList.remove('active'));
   el.classList.add('active');
-  renderSchedule();
+  const schedList=document.getElementById('sched-list');
+  const schedPO=document.getElementById('sched-playoffs');
+  const schedExtras=document.getElementById('panel-schedule').querySelectorAll('.ebar, #sched-team-select, label');
+  if(f==='playoffs'){
+    if(schedList) schedList.style.display='none';
+    if(schedPO) schedPO.style.display='';
+    schedExtras.forEach(e=>e.style.display='none');
+    renderSchedPlayoffs();
+  } else {
+    if(schedList) schedList.style.display='';
+    if(schedPO) schedPO.style.display='none';
+    schedExtras.forEach(e=>e.style.display='');
+    renderSchedule();
+  }
 }
+function renderSchedPlayoffs(){
+  const el=document.getElementById('sched-playoffs');
+  if(!el)return;
+  const clsColors={A:'var(--cA)',B:'var(--cB)',C:'var(--cC)',D:'var(--cD)'};
+  const clsNames={A:'Class A',B:'Class B',C:'Class C',D:'Class D'};
+  // Sort order for rounds
+  const roundOrder=['First Round','Quarter Finals','Semifinals','Finals'];
+  const summaryRows=[];
+  ['A','B','C','D'].forEach(cls=>{
+    const cfg=state.brackets&&state.brackets[cls];
+    if(!cfg||!cfg.matchResults) return;
+    const rounds=cfg.rounds||DEFAULT_BRACKET_CONFIG[cls].rounds;
+    const hasByeSeeds=cfg.byeSeeds||(DEFAULT_BRACKET_CONFIG[cls]&&DEFAULT_BRACKET_CONFIG[cls].byeSeeds)||0;
+    Object.entries(cfg.matchResults).forEach(([key,st])=>{
+      if(!st||st.topScore==null||st.botScore==null) return;
+      if(key==='playin'){
+        // Play-in game
+        const winner=st.winner==='top'?st.top:st.bot;
+        summaryRows.push({cls,ri:-1,round:'Play-In',top:st.top,bot:st.bot,topScore:st.topScore,botScore:st.botScore,winner});
+        return;
+      }
+      const m=key.match(/^r(\d+)m(\d+)$/);
+      if(!m) return;
+      const ri=parseInt(m[1]);
+      const roundInfo=rounds[ri]||{name:'Round '+(ri+1)};
+      const winner=st.winner==='top'?st.top:st.winner==='bot'?st.bot:'';
+      summaryRows.push({cls,ri,round:roundInfo.name,top:st.top,bot:st.bot,topScore:st.topScore,botScore:st.botScore,winner});
+    });
+  });
+  if(!summaryRows.length){
+    el.innerHTML='<div style="color:var(--gray);font-size:14px;padding:24px;text-align:center">No playoff results yet.</div>';
+    return;
+  }
+  // Sort by class then round
+  summaryRows.sort((a,b)=>{
+    if(a.cls!==b.cls) return a.cls<b.cls?-1:1;
+    return a.ri-b.ri;
+  });
+  let html='<div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">';
+  ['A','B','C','D'].forEach(cls=>{
+    const rows=summaryRows.filter(r=>r.cls===cls);
+    if(!rows.length) return;
+    const col=clsColors[cls];
+    html+=`<div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:13px;text-transform:uppercase;letter-spacing:2px;color:${col};margin-top:14px;margin-bottom:4px;padding-left:4px">${clsNames[cls]}</div>`;
+    rows.forEach(r=>{
+      const topW=r.winner===r.top;
+      const botW=r.winner===r.bot;
+      html+=`<div style="display:flex;align-items:center;gap:10px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--gray);min-width:90px">${r.round}</span>
+        <span style="font-size:13px;font-weight:${topW?'900':'400'};color:${topW?'var(--text)':'var(--gray)'};flex:1">${r.top||'TBD'}</span>
+        <span style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:15px;color:var(--gold);min-width:50px;text-align:center">${r.topScore} – ${r.botScore}</span>
+        <span style="font-size:13px;font-weight:${botW?'900':'400'};color:${botW?'var(--text)':'var(--gray)'};flex:1;text-align:right">${r.bot||'TBD'}</span>
+      </div>`;
+    });
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+
 function renderSchedule(){
   // Populate team dropdown with all active teams sorted alphabetically
   const sel=document.getElementById('sched-team-select');
