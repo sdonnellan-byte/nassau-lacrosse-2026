@@ -3294,47 +3294,6 @@ function renderPlayoffsTab(highlightCls){
     </div>`;
   }
 
-  // ── PLAYOFF RESULTS SUMMARY ─────────────────────────────────────────────
-  // Show completed playoff results below all brackets
-  const summaryRows=[];
-  ['A','B','C','D'].forEach(cls=>{
-    const cfg=state.brackets[cls];
-    if(!cfg||!cfg.matchResults) return;
-    const rounds=cfg.rounds||DEFAULT_BRACKET_CONFIG[cls].rounds;
-    const hasByeSeeds=cfg.byeSeeds||(DEFAULT_BRACKET_CONFIG[cls]&&DEFAULT_BRACKET_CONFIG[cls].byeSeeds)||0;
-    Object.entries(cfg.matchResults).forEach(([key,st])=>{
-      if(!st||st.topScore==null||st.botScore==null) return;
-      // Parse round index from key e.g. r1m0
-      const m=key.match(/^r(\d+)m(\d+)$/);
-      if(!m) return;
-      const ri=parseInt(m[1]);
-      // For byeSeeds brackets the round indices are offset by 1 from rounds array
-      const roundInfo=rounds[hasByeSeeds>0?ri:ri]||{name:`Round ${ri+1}`};
-      const winner=st.winner==='top'?st.top:st.winner==='bot'?st.bot:'';
-      summaryRows.push({cls,round:roundInfo.name,top:st.top,bot:st.bot,topScore:st.topScore,botScore:st.botScore,winner});
-    });
-  });
-  if(summaryRows.length){
-    const clsColors2={A:'var(--cA)',B:'var(--cB)',C:'var(--cC)',D:'var(--cD)'};
-    html+=`<div style="margin-top:32px;border-top:2px solid var(--border);padding-top:24px">
-      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:18px;text-transform:uppercase;letter-spacing:2px;color:var(--gold);margin-bottom:16px">📋 Playoff Results</div>
-      <div style="display:flex;flex-direction:column;gap:6px">
-        ${summaryRows.map(r=>{
-          const col=clsColors2[r.cls];
-          const topW=r.winner===r.top;
-          const botW=r.winner===r.bot;
-          return`<div style="display:flex;align-items:center;gap:10px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;flex-wrap:wrap">
-            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:${col};min-width:70px">Class ${r.cls}</span>
-            <span style="font-size:11px;color:var(--gray);min-width:90px">${r.round}</span>
-            <span style="font-size:13px;font-weight:${topW?'900':'400'};color:${topW?'var(--text)':'var(--gray)'};flex:1">${r.top}</span>
-            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:15px;color:var(--gold);min-width:50px;text-align:center">${r.topScore} – ${r.botScore}</span>
-            <span style="font-size:13px;font-weight:${botW?'900':'400'};color:${botW?'var(--text)':'var(--gray)'};flex:1;text-align:right">${r.bot}</span>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`;
-  }
-
   el.innerHTML=html;
 }
 
