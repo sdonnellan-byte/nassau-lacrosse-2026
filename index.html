@@ -350,7 +350,6 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
     <button class="fbtn" onclick="filterSched('all',this)">All</button>
     <button class="fbtn active" onclick="filterSched('pending',this)">Unplayed</button>
     <button class="fbtn" onclick="filterSched('played',this)">Played</button>
-    <button class="fbtn" onclick="filterSched('playoffs',this)" id="sched-po-btn" style="display:none">🥍 Playoffs</button>
   </div>
   <div style="margin:8px 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
     <label style="font-size:12px;color:var(--gray);font-weight:600;white-space:nowrap">🔍 Jump to Team:</label>
@@ -362,7 +361,6 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
   </div>
   <div class="ebar"><button class="btn btn-ol btn-sm" onclick="exportCSV('schedule')">📊 Export to Google Sheets</button></div>
   <div id="sched-list"></div>
-  <div id="sched-playoffs" style="display:none"></div>
 </div>
 
 <!-- RECENT RESULTS (public) -->
@@ -919,17 +917,6 @@ function safeGames(){return state.games||[];}
 function safeTM(id){return TM[id]||{name:id||'Unknown',conf:0,cls:'?',id:id};}
 
 // ── TITLE ──────────────────────────────────────────────────────────────────
-function updateSchedPlayoffsBtn(){
-  const btn=document.getElementById('sched-po-btn');
-  if(!btn) return;
-  const anyResults=['A','B','C','D'].some(cls=>{
-    const cfg=state.brackets&&state.brackets[cls];
-    if(!cfg||!cfg.matchResults) return false;
-    return Object.values(cfg.matchResults).some(st=>st&&st.topScore!=null&&st.botScore!=null);
-  });
-  btn.style.display=anyResults?'':'none';
-}
-
 function updateTitle(){
   const y=state.year||2026;
   document.getElementById('title-year').textContent=y;
@@ -1168,13 +1155,27 @@ function initSelects(){
   const confs=[...new Set(TEAMS.map(t=>t.conf))].sort();
   // schedule filter conf buttons
   const fb=document.getElementById('sched-fbar');
-  fb.querySelectorAll('.cfbtn').forEach(b=>b.remove());
+  fb.querySelectorAll('.cfbtn,.pofbtn').forEach(b=>b.remove());
   confs.forEach(c=>{
     const b=document.createElement('button');b.className='fbtn cfbtn';
     b.innerHTML=`<span class="cb ${cClass(c)}">C${c}</span>`;
     b.onclick=function(){filterSched(String(c),this);};
     fb.appendChild(b);
   });
+  // Add Playoffs subtab if any playoff results exist
+  const anyPOResults=['A','B','C','D'].some(cls=>{
+    const cfg=state.brackets&&state.brackets[cls];
+    if(!cfg||!cfg.matchResults) return false;
+    return Object.values(cfg.matchResults).some(st=>st&&st.topScore!=null&&st.botScore!=null);
+  });
+  if(anyPOResults){
+    const pb=document.createElement('button');
+    pb.className='fbtn pofbtn';
+    pb.id='sched-po-btn';
+    pb.innerHTML='🥍 Playoffs';
+    pb.onclick=function(){filterSched('playoffs',this);};
+    fb.appendChild(pb);
+  }
   // num conf select
   const ns=document.getElementById('num-conf-sel');if(ns)ns.value=confs.length;
   // new team conf select
@@ -2195,23 +2196,14 @@ function filterSched(f,el){
   schedFilter=f;
   document.querySelectorAll('#sched-fbar .fbtn').forEach(b=>b.classList.remove('active'));
   el.classList.add('active');
-  const schedList=document.getElementById('sched-list');
-  const schedPO=document.getElementById('sched-playoffs');
-  const schedExtras=document.getElementById('panel-schedule').querySelectorAll('.ebar, #sched-team-select, label');
   if(f==='playoffs'){
-    if(schedList) schedList.style.display='none';
-    if(schedPO) schedPO.style.display='';
-    schedExtras.forEach(e=>e.style.display='none');
     renderSchedPlayoffs();
   } else {
-    if(schedList) schedList.style.display='';
-    if(schedPO) schedPO.style.display='none';
-    schedExtras.forEach(e=>e.style.display='');
     renderSchedule();
   }
 }
 function renderSchedPlayoffs(){
-  const el=document.getElementById('sched-playoffs');
+  const el=document.getElementById('sched-list');
   if(!el)return;
   const clsColors={A:'var(--cA)',B:'var(--cB)',C:'var(--cC)',D:'var(--cD)'};
   const clsNames={A:'Class A',B:'Class B',C:'Class C',D:'Class D'};
