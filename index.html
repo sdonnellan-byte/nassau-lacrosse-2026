@@ -875,6 +875,7 @@ function saveState(){
       archives:state.archives||[],
       playoffSpots:state.playoffSpots||DEFAULT_PLAYOFF_SPOTS,
       confRules:state.confRules||{1:'allQualify',2:'allQualify',3:'fillSpots',4:'playIn'},
+      confNames:state.confNames||{},
       standingsOverrides:state.standingsOverrides||{},
       brackets:state.brackets||{},
       messages:state.messages||[],
@@ -890,6 +891,7 @@ if(!state.pending)state.pending=[];
 if(!state.archives)state.archives=[];
 if(!state.playoffSpots)state.playoffSpots={...DEFAULT_PLAYOFF_SPOTS};
 if(!state.confRules)state.confRules={1:'allQualify',2:'allQualify',3:'fillSpots',4:'playIn'};
+if(!state.confNames)state.confNames={};
 if(!state.standingsOverrides)state.standingsOverrides={};
 if(!state.brackets)state.brackets=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG));
 if(!state.messages)state.messages=[];
@@ -1158,7 +1160,7 @@ function initSelects(){
   fb.querySelectorAll('.cfbtn,.pofbtn').forEach(b=>b.remove());
   confs.forEach(c=>{
     const b=document.createElement('button');b.className='fbtn cfbtn';
-    b.innerHTML=`<span class="cb ${cClass(c)}">C${c}</span>`;
+    b.innerHTML=`<span class="cb ${cClass(c)}">${getConfShort(c)}</span>`;
     b.onclick=function(){filterSched(String(c),this);};
     fb.appendChild(b);
   });
@@ -1727,12 +1729,19 @@ function renderConfRulesEditor(){
     {v:'allQualify', label:'All Qualify',     color:'var(--cA)', desc:'Every team gets a bracket seed'},
     {v:'fillSpots',  label:'Fill Spots',      color:'var(--cC)', desc:'Teams fill remaining seeds by class standing'},
     {v:'playIn',     label:'Play-In Only',    color:'var(--gold)',desc:'Conference champion earns a play-in game'},
+    {v:'winPct500',  label:'.500 or Better',  color:'var(--blue-lt)',desc:'Only teams with \u2265.500 winning % qualify'},
   ];
   el.innerHTML=confs.map(conf=>{
     const cur=rules[conf]||rules[String(conf)]||'fillSpots';
     const curOpt=opts.find(o=>o.v===cur)||opts[1];
+    const cname=getConfName(conf);
+    const isCustom=state.confNames&&state.confNames[conf];
     return`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--navy);border:1px solid var(--border);border-radius:8px;padding:10px 13px">
-      <span class="cb ${cClass(conf)}" style="font-size:13px;font-weight:900;min-width:70px">Conf ${conf}</span>
+      <span class="cb ${cClass(conf)}" style="font-size:13px;font-weight:900;min-width:28px">${conf}</span>
+      <button onclick="renameConference(${conf})" title="Rename this conference"
+        style="font-size:11px;padding:3px 8px;background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer;color:${isCustom?'var(--gold)':'var(--gray)'};white-space:nowrap;flex-shrink:0">
+        ✏️ ${cname}
+      </button>
       <select onchange="updateConfRule(${conf},this.value)"
         style="flex:1;min-width:190px;font-size:12px;padding:5px 8px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text)">
         ${opts.map(o=>`<option value="${o.v}"${cur===o.v?' selected':''}>${o.label} — ${o.desc}</option>`).join('')}
@@ -1740,6 +1749,26 @@ function renderConfRulesEditor(){
       <span style="font-size:11px;font-weight:700;color:${curOpt.color};min-width:80px">${curOpt.label}</span>
     </div>`;
   }).join('');
+}
+
+function renameConference(conf){
+  if(!state.confNames) state.confNames={};
+  const current=state.confNames[conf]||('Conference '+conf);
+  const newName=prompt('Enter a name for Conference '+conf+' (e.g. "Conference 3A"). Leave blank to revert to default:',current);
+  if(newName===null) return;
+  const trimmed=newName.trim();
+  if(trimmed===''||trimmed==='Conference '+conf){
+    delete state.confNames[conf];
+    delete state.confNames[String(conf)];
+  } else {
+    state.confNames[conf]=trimmed;
+    state.confNames[String(conf)]=trimmed;
+  }
+  _debouncedConfSave();
+  renderConfRulesEditor();
+  renderConfStandings();
+  renderClassStandings();
+  showToast('\u2713 Conference '+conf+' renamed to: '+(state.confNames[conf]||'Conference '+conf));
 }
 
 function updateConfRule(conf,rule){
@@ -1750,8 +1779,8 @@ function updateConfRule(conf,rule){
   renderConfRulesEditor();
   renderConfStandings();
   renderClassStandings();
-  const labels={allQualify:'All Qualify',fillSpots:'Fill Spots',playIn:'Play-In Only'};
-  showToast(`✓ Conference ${conf}: ${labels[rule]||rule}`);
+  const labels={allQualify:'All Qualify',fillSpots:'Fill Spots',playIn:'Play-In Only',winPct500:'.500 or Better'};
+  showToast('\u2713 '+getConfName(conf)+': '+(labels[rule]||rule));
 }
 
 function renderConfMgr(){
@@ -1766,7 +1795,7 @@ function renderConfMgr(){
     const col=cColor(conf);
     return `<div style="background:var(--card2);border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-bottom:10px">
       <div style="padding:8px 13px;border-bottom:2px solid ${col};font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13px;text-transform:uppercase;display:flex;align-items:center;gap:7px">
-        <span class="cb ${cClass(conf)}">Conf ${conf}</span> Conference ${conf} — ${ct.filter(t=>!t._ph).length} teams
+        <span class="cb ${cClass(conf)}">Conf ${conf}</span> ${getConfName(conf)} — ${ct.filter(t=>!t._ph).length} teams
       </div>
       <div style="padding:7px">
         ${ct.map(t=>`<div class="trow">
@@ -2065,13 +2094,13 @@ function renderConfStandings(){
     const hasOverride=state.standingsOverrides&&state.standingsOverrides[key]&&state.standingsOverrides[key].length>0;
     const confRules=state.confRules||{};
     const rule=confRules[conf]||confRules[String(conf)]||'fillSpots';
-    const ruleLabel=rule==='allQualify'?'✦ All qualify':rule==='fillSpots'?'◈ Fills brackets':rule==='playIn'?'⭐ Conf Champ Qualifies':'';
+    const ruleLabel=rule==='allQualify'?'✦ All qualify':rule==='fillSpots'?'◈ Fills brackets':rule==='playIn'?'⭐ Conf Champ Qualifies':rule==='winPct500'?'☑ .500+ W% only':'';
     const col=cColor(conf),cc=cClass(conf);
     const div=document.createElement('div');div.className='cblk';
     div.innerHTML=`
       <div class="chdr" style="background:${col}18;border-bottom:2px solid ${col}">
         <span class="cb ${cc}">Conf ${conf}</span>
-        Conference ${conf}
+        ${getConfName(conf)}
         <span style="margin-left:auto;font-size:9px;color:var(--gray)">${ruleLabel}</span>
         ${isAdmin&&hasOverride?`<button onclick="clearStandingsOverride('${key}')" style="font-size:10px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#f87171;border-radius:4px;padding:1px 6px;cursor:pointer;margin-left:6px" title="Clear manual override">↺ Auto</button>`:''}
       </div>
@@ -2126,7 +2155,15 @@ function renderClassStandings(){
     const seeded=[];
     blocks.forEach(({conf,ids})=>{
       const rule=rules[conf]||rules[String(conf)]||'fillSpots';
-      if(rule==='allQualify'||rule==='fillSpots') ids.forEach(id=>seeded.push({id,conf}));
+      if(rule==='allQualify'||rule==='fillSpots'){
+        ids.forEach(id=>seeded.push({id,conf}));
+      } else if(rule==='winPct500'){
+        // Only qualify teams with .500 or better win% (ignore ties/losses only records)
+        ids.forEach(id=>{
+          const r2=rec[id];
+          if(r2&&(r2.w+r2.l+r2.t)>0&&(r2.w/(r2.w+r2.l+r2.t))>=0.5) seeded.push({id,conf});
+        });
+      }
     });
     const seededCapped=seeded.slice(0,spots);
     const allIds=[];blocks.forEach(({ids})=>ids.forEach(id=>allIds.push(id)));
@@ -2202,6 +2239,15 @@ function filterSched(f,el){
     renderSchedule();
   }
 }
+function getConfName(conf){
+  // Returns custom name if set, otherwise default "Conference N"
+  return (state.confNames&&state.confNames[conf])||'Conference '+conf;
+}
+function getConfShort(conf){
+  // Returns short label — custom name if set, else "CN"
+  return (state.confNames&&state.confNames[conf])||('C'+conf);
+}
+
 function renderSchedPlayoffs(){
   const el=document.getElementById('sched-list');
   if(!el)return;
@@ -2545,6 +2591,11 @@ function getBracketSeeds(cls){
     // playIn = conf champ handled separately; skip here
     if(rule==='allQualify'||rule==='fillSpots'){
       ids.forEach(id=>seeded.push({id,conf}));
+    } else if(rule==='winPct500'){
+      ids.forEach(id=>{
+        const r2=rec[id];
+        if(r2&&(r2.w+r2.l+r2.t)>0&&(r2.w/(r2.w+r2.l+r2.t))>=0.5) seeded.push({id,conf});
+      });
     }
   });
   const spots=(state.brackets&&state.brackets[cls]&&state.brackets[cls].size)||(PLAYOFF_SPOTS[cls]||8);
@@ -4176,6 +4227,7 @@ if(isFirebaseConfigured){
         }
         if(data.playoffSpots){state.playoffSpots=data.playoffSpots;PLAYOFF_SPOTS=state.playoffSpots;}
         if(data.confRules){state.confRules=data.confRules;}
+        if(data.confNames){state.confNames=data.confNames;}
         if(data.standingsOverrides){state.standingsOverrides=data.standingsOverrides;}
         if(data.brackets){
           if(Date.now()-_bracketSaveTime < 3000){
