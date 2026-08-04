@@ -570,7 +570,28 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
     </div>
     <div id="conf-mgr"></div>
     <div class="dvd"></div>
+
+    <!-- SCHEDULE FORMAT -->
+    <div style="background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:18px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;color:var(--gold)">📅 Schedule Format</div>
+      <p style="font-size:12px;color:var(--gray);margin-bottom:14px">
+        Configure how games are scheduled per conference, and set up crossover games between conferences.
+        <strong style="color:var(--red)"> ⚠️ Changing format rebuilds the schedule — existing unplayed games reset (played results kept).</strong>
+      </p>
+      <div id="sched-format-editor" style="display:flex;flex-direction:column;gap:10px">
+        <!-- Rendered by renderSchedFormatEditor() -->
+      </div>
+      <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;color:var(--text)">↔ Crossover Games</div>
+        <p style="font-size:12px;color:var(--gray);margin-bottom:10px">Add crossover matchups between conferences (max 5 per pair). Specify seed positions to match — e.g. seed #1 in Conf 1 plays seeds #1, #4, #7 in Conf 2.</p>
+        <div id="crossover-editor" style="display:flex;flex-direction:column;gap:8px"></div>
+        <button class="btn btn-ol btn-sm" onclick="addCrossoverRule()" style="margin-top:8px">+ Add Crossover Rule</button>
+      </div>
+      <button class="btn btn-p" onclick="applySchedFormat()" style="margin-top:14px">🔄 Rebuild Schedule with These Settings</button>
+    </div>
+
     <div class="stitle" style="font-size:14px">➕ Add New Team</div>
+    <p style="font-size:12px;color:var(--gray);margin-bottom:10px">Type a name, pick class and conference, then click <strong>+ Add</strong>. The team's schedule games are added automatically. To remove a team, click <strong>✕</strong> next to their name above.</p>
     <div class="atr">
       <input type="text" id="nt-name" placeholder="Team name" style="flex:3;min-width:140px">
       <select id="nt-cls" style="flex:1;min-width:100px;width:auto">
@@ -773,17 +794,71 @@ function migrateTeams(teams){
 let TEAMS=[];
 let TM={};
 function buildTM(){TM={};TEAMS.forEach(t=>TM[t.id]=t);}
+// Safe schedule config — populated after state loads, safe to read before
+var _schedFormat={};
+var _crossoverRules=[];
 
-function makeSchedule(teams){
+function makeSchedule(teams,schedFormatOverride,crossoverOverride){
   const t=teams||TEAMS;
   const games=[];
+  const gameSet=new Set();
+  const fmt=schedFormatOverride||_schedFormat||{};
+
+  function addGame(homeId,awayId,conf){
+    const key=homeId+'__'+awayId;
+    const key2=awayId+'__'+homeId;
+    if(gameSet.has(key)||gameSet.has(key2))return;
+    gameSet.add(key);
+    games.push({id:key,home:homeId,away:awayId,conf,homeScore:null,awayScore:null,played:false});
+  }
+
   const confs=[...new Set(t.map(x=>x.conf))].sort();
+
+  // Intra-conference games
   confs.forEach(conf=>{
     const ct=t.filter(x=>x.conf===conf&&!x._ph);
-    for(let i=0;i<ct.length;i++)
-      for(let j=i+1;j<ct.length;j++)
-        games.push({id:`${ct[i].id}__${ct[j].id}`,home:ct[i].id,away:ct[j].id,conf,homeScore:null,awayScore:null,played:false});
+    const isDouble=fmt[conf]==='double'||fmt[String(conf)]==='double';
+    for(let i=0;i<ct.length;i++){
+      for(let j=i+1;j<ct.length;j++){
+        addGame(ct[i].id,ct[j].id,conf);
+        if(isDouble){
+          // Home & Away: add reverse fixture too
+          const revKey=ct[j].id+'__'+ct[i].id;
+          if(!gameSet.has(revKey)){
+            gameSet.add(revKey);
+            games.push({id:revKey,home:ct[j].id,away:ct[i].id,conf,homeScore:null,awayScore:null,played:false});
+          }
+        }
+      }
+    }
   });
+
+  // Crossover games
+  const rules=crossoverOverride||_crossoverRules||[];
+  rules.forEach(rule=>{
+    const confA=parseInt(rule.confA)||rule.confA;
+    const confB=parseInt(rule.confB)||rule.confB;
+    const teamsA=t.filter(x=>x.conf===confA&&!x._ph);
+    const teamsB=t.filter(x=>x.conf===confB&&!x._ph);
+    if(!teamsA.length||!teamsB.length)return;
+    // Sort each conf by current standing (use array order as proxy — admin sets via seed positions)
+    let gameCount=0;
+    (rule.matchups||[]).forEach(mu=>{
+      const seedA=parseInt(mu.seedA);
+      if(!seedA||seedA<1||seedA>teamsA.length)return;
+      const teamA=teamsA[seedA-1];
+      if(!teamA)return;
+      const seedsB=(mu.seedsB||'').split(',').map(s=>parseInt(s.trim())).filter(s=>!isNaN(s)&&s>=1&&s<=teamsB.length);
+      seedsB.forEach(sB=>{
+        if(gameCount>=5)return;
+        const teamB=teamsB[sB-1];
+        if(!teamB)return;
+        addGame(teamA.id,teamB.id,confA);
+        gameCount++;
+      });
+    });
+  });
+
   return games;
 }
 
@@ -876,6 +951,8 @@ function saveState(){
       playoffSpots:state.playoffSpots||DEFAULT_PLAYOFF_SPOTS,
       confRules:state.confRules||{1:'allQualify',2:'allQualify',3:'fillSpots',4:'playIn'},
       confNames:state.confNames||{},
+      schedFormat:state.schedFormat||{},
+      crossoverRules:state.crossoverRules||[],
       standingsOverrides:state.standingsOverrides||{},
       brackets:state.brackets||{},
       messages:state.messages||[],
@@ -886,12 +963,17 @@ function saveState(){
 }
 
 let state=loadState();
-let isAdmin=false,editGameId=null,schedFilter='pending',schedTeamFilter='';
+var isAdmin=false;let editGameId=null,schedFilter='pending',schedTeamFilter='';
+// Sync safe schedule config now that state is loaded
+_schedFormat=state.schedFormat||{};
+_crossoverRules=state.crossoverRules||[];
 if(!state.pending)state.pending=[];
 if(!state.archives)state.archives=[];
 if(!state.playoffSpots)state.playoffSpots={...DEFAULT_PLAYOFF_SPOTS};
 if(!state.confRules)state.confRules={1:'allQualify',2:'allQualify',3:'fillSpots',4:'playIn'};
 if(!state.confNames)state.confNames={};
+if(!state.schedFormat)state.schedFormat={};
+if(!state.crossoverRules)state.crossoverRules=[];
 if(!state.standingsOverrides)state.standingsOverrides={};
 if(!state.brackets)state.brackets=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG));
 if(!state.messages)state.messages=[];
@@ -1671,6 +1753,17 @@ function changeTeamClass(tid,cls){
   const t=TEAMS.find(x=>x.id===tid);if(!t)return;
   t.cls=cls;buildTM();_debouncedConfSave();renderAll();showToast(`${t.name} → Class ${cls}`);
 }
+function renameTeam(tid){
+  const t=TEAMS.find(x=>x.id===tid);if(!t)return;
+  const newName=prompt('Rename team:',t.name);
+  if(!newName||!newName.trim())return;
+  const trimmed=newName.trim();
+  if(trimmed===t.name)return;
+  t.name=trimmed;
+  buildTM();_debouncedConfSave();renderAll();renderConfMgr();
+  showToast('✓ Renamed to '+trimmed);
+}
+
 function removeTeam(tid){
   const t=TEAMS.find(x=>x.id===tid);if(!t)return;
   if(!confirm(`Remove "${t.name}"?`))return;
@@ -1693,6 +1786,8 @@ function addNewTeam(){
 }
 
 function rebuildSchedule(){
+  _schedFormat=state.schedFormat||{};
+  _crossoverRules=state.crossoverRules||[];
   const old={};state.games.forEach(g=>{if(g.played)old[g.id]=g;});
   state.games=mergeGames(makeSchedule(),Object.values(old));
 }
@@ -1786,9 +1881,12 @@ function updateConfRule(conf,rule){
 function renderConfMgr(){
   renderPlayoffSpotsEditor();
   renderConfRulesEditor();
+  renderSchedFormatEditor();
+  renderCrossoverEditor();
   const confs=[...new Set(TEAMS.map(t=>t.conf))].sort();
   const cc=document.getElementById('conf-counts');
-  if(cc)cc.textContent=confs.map(c=>`C${c}: ${TEAMS.filter(t=>t.conf===c&&!t._ph).length}`).join(' · ');
+  const totalReal=TEAMS.filter(t=>!t._ph).length;
+  if(cc)cc.textContent=`${totalReal} teams total — `+confs.map(c=>`C${c}: ${TEAMS.filter(t=>t.conf===c&&!t._ph).length}`).join(' · ');
   const el=document.getElementById('conf-mgr');if(!el)return;
   el.innerHTML=confs.map(conf=>{
     const ct=TEAMS.filter(t=>t.conf===conf);
@@ -1808,7 +1906,8 @@ function renderConfMgr(){
           <select style="width:auto;padding:3px 6px;font-size:11px" onchange="changeTeamClass('${t.id}',this.value)">
             ${['A','B','C','D'].map(cl=>`<option value="${cl}"${cl===t.cls?' selected':''}>${cl}</option>`).join('')}
           </select>
-          ${!t._ph?`<button class="btn btn-d btn-sm" style="font-size:10px;padding:2px 7px" onclick="removeTeam('${t.id}')">✕</button>`:''}
+          ${!t._ph?`<button class="btn btn-ol btn-sm" style="font-size:10px;padding:2px 7px;margin-left:2px" onclick="renameTeam('${t.id}')" title="Rename team">✏️</button>`:''}
+          ${!t._ph?`<button class="btn btn-d btn-sm" style="font-size:10px;padding:2px 7px" onclick="removeTeam('${t.id}')" title="Remove team">✕</button>`:''}
         </div>`).join('')}
       </div>
     </div>`;
@@ -2246,6 +2345,120 @@ function getConfName(conf){
 function getConfShort(conf){
   // Returns short label — custom name if set, else "CN"
   return (state.confNames&&state.confNames[conf])||('C'+conf);
+}
+
+
+function renderSchedFormatEditor(){
+  const el=document.getElementById('sched-format-editor');if(!el)return;
+  const confs=[...new Set(TEAMS.filter(t=>!t._ph).map(t=>t.conf))].sort();
+  const fmt=state.schedFormat||{};
+  el.innerHTML=confs.map(conf=>{
+    const dbl=fmt[conf]==='double'||fmt[String(conf)]==='double';
+    return`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--navy);border:1px solid var(--border);border-radius:8px;padding:10px 13px">
+      <span class="cb ${cClass(conf)}" style="font-size:13px;font-weight:900;min-width:28px">${conf}</span>
+      <span style="font-size:13px;color:var(--text);flex:1">${getConfName(conf)}</span>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text)">
+        <input type="checkbox" id="sched-dbl-${conf}" ${dbl?'checked':''} onchange="toggleDoubleRR(${conf},this.checked)"
+          style="width:16px;height:16px;cursor:pointer">
+        Home &amp; Away (play each team twice)
+      </label>
+    </div>`;
+  }).join('');
+}
+
+function toggleDoubleRR(conf,val){
+  if(!state.schedFormat)state.schedFormat={};
+  state.schedFormat[conf]=val?'double':'single';
+  state.schedFormat[String(conf)]=val?'double':'single';
+}
+
+function renderCrossoverEditor(){
+  const el=document.getElementById('crossover-editor');if(!el)return;
+  const rules=state.crossoverRules||[];
+  const confs=[...new Set(TEAMS.filter(t=>!t._ph).map(t=>t.conf))].sort();
+  if(!rules.length){el.innerHTML='<div style="font-size:12px;color:var(--gray);font-style:italic">No crossover rules yet.</div>';return;}
+  el.innerHTML=rules.map((rule,ri)=>{
+    const confOpts=confs.map(c=>`<option value="${c}" ${rule.confA==c?'selected':''}>${getConfName(c)}</option>`).join('');
+    const confOpts2=confs.map(c=>`<option value="${c}" ${rule.confB==c?'selected':''}>${getConfName(c)}</option>`).join('');
+    return`<div style="background:var(--navy);border:1px solid var(--border);border-radius:8px;padding:10px 13px;display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--gray)">Rule ${ri+1}:</span>
+        <select onchange="updateCrossover(${ri},'confA',this.value)" style="font-size:12px;padding:3px 6px;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--text)">${confOpts}</select>
+        <span style="color:var(--gray);font-size:12px">↔</span>
+        <select onchange="updateCrossover(${ri},'confB',this.value)" style="font-size:12px;padding:3px 6px;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--text)">${confOpts2}</select>
+        <button onclick="removeCrossoverRule(${ri})" style="background:none;border:1px solid var(--red);border-radius:4px;color:var(--red);font-size:11px;padding:2px 8px;cursor:pointer">✕ Remove</button>
+      </div>
+      <div style="font-size:12px;color:var(--gray);margin-bottom:2px">Seed matchups (Conf ${rule.confA} seed → Conf ${rule.confB} seeds, comma-separated, max 5 games):</div>
+      ${(rule.matchups||[{seedA:'',seedsB:''}]).map((mu,mi)=>`
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:12px">
+        <span style="font-size:11px;color:var(--gray);min-width:60px">Seed #</span>
+        <input type="number" min="1" max="20" value="${mu.seedA||''}" placeholder="e.g. 1"
+          onchange="updateCrossoverMatchup(${ri},${mi},'seedA',this.value)"
+          style="width:60px;font-size:12px;padding:3px 6px;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--gold);text-align:center">
+        <span style="font-size:11px;color:var(--gray)">in ${getConfName(rule.confA)} plays seeds</span>
+        <input type="text" value="${mu.seedsB||''}" placeholder="e.g. 1,4,7"
+          onchange="updateCrossoverMatchup(${ri},${mi},'seedsB',this.value)"
+          style="width:100px;font-size:12px;padding:3px 6px;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--gold)">
+        <span style="font-size:11px;color:var(--gray)">in ${getConfName(rule.confB)}</span>
+        ${(rule.matchups||[]).length>1?`<button onclick="removeCrossoverMatchup(${ri},${mi})" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:13px">✕</button>`:''}
+      </div>`).join('')}
+      <button onclick="addCrossoverMatchup(${ri})" style="background:none;border:1px dashed var(--border);border-radius:5px;color:var(--gray);font-size:11px;padding:3px 10px;cursor:pointer;margin-left:12px;align-self:flex-start">+ Add seed matchup</button>
+    </div>`;
+  }).join('');
+}
+
+function addCrossoverRule(){
+  if(!state.crossoverRules)state.crossoverRules=[];
+  const confs=[...new Set(TEAMS.filter(t=>!t._ph).map(t=>t.conf))].sort();
+  state.crossoverRules.push({confA:confs[0]||1,confB:confs[1]||2,matchups:[{seedA:1,seedsB:'1'}]});
+  renderCrossoverEditor();
+}
+
+function removeCrossoverRule(ri){
+  if(!state.crossoverRules)return;
+  state.crossoverRules.splice(ri,1);
+  renderCrossoverEditor();
+}
+
+function updateCrossover(ri,field,val){
+  if(!state.crossoverRules||!state.crossoverRules[ri])return;
+  state.crossoverRules[ri][field]=isNaN(parseInt(val))?val:parseInt(val);
+  renderCrossoverEditor();
+}
+
+function addCrossoverMatchup(ri){
+  if(!state.crossoverRules||!state.crossoverRules[ri])return;
+  const rule=state.crossoverRules[ri];
+  if(!rule.matchups)rule.matchups=[];
+  const totalGames=rule.matchups.reduce((s,m)=>{
+    const seeds=(m.seedsB||'').split(',').filter(x=>x.trim()).length;
+    return s+seeds;
+  },0);
+  if(totalGames>=5){showToast('Max 5 crossover games per rule','tw');return;}
+  rule.matchups.push({seedA:'',seedsB:''});
+  renderCrossoverEditor();
+}
+
+function removeCrossoverMatchup(ri,mi){
+  if(!state.crossoverRules||!state.crossoverRules[ri])return;
+  state.crossoverRules[ri].matchups.splice(mi,1);
+  if(!state.crossoverRules[ri].matchups.length) state.crossoverRules[ri].matchups=[{seedA:'',seedsB:''}];
+  renderCrossoverEditor();
+}
+
+function updateCrossoverMatchup(ri,mi,field,val){
+  if(!state.crossoverRules||!state.crossoverRules[ri])return;
+  if(!state.crossoverRules[ri].matchups) state.crossoverRules[ri].matchups=[];
+  if(!state.crossoverRules[ri].matchups[mi]) state.crossoverRules[ri].matchups[mi]={};
+  state.crossoverRules[ri].matchups[mi][field]=field==='seedA'?parseInt(val)||val:val;
+}
+
+function applySchedFormat(){
+  if(!confirm('Rebuild schedule with new format? Unplayed games reset; played results are kept.'))return;
+  rebuildSchedule();
+  saveState();
+  renderAll();
+  showToast('\u2713 Schedule rebuilt with new format!');
 }
 
 function renderSchedPlayoffs(){
@@ -4228,6 +4441,8 @@ if(isFirebaseConfigured){
         if(data.playoffSpots){state.playoffSpots=data.playoffSpots;PLAYOFF_SPOTS=state.playoffSpots;}
         if(data.confRules){state.confRules=data.confRules;}
         if(data.confNames){state.confNames=data.confNames;}
+        if(data.schedFormat){state.schedFormat=data.schedFormat;_schedFormat=data.schedFormat;}
+        if(data.crossoverRules){state.crossoverRules=data.crossoverRules;_crossoverRules=data.crossoverRules;}
         if(data.standingsOverrides){state.standingsOverrides=data.standingsOverrides;}
         if(data.brackets){
           if(Date.now()-_bracketSaveTime < 3000){
