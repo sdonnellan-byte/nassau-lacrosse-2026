@@ -291,7 +291,13 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
   <div class="modal xl">
     <button class="mcl" onclick="closeArcView()">✕</button>
     <h2 id="arc-modal-title">📦 Archives</h2>
-    <div id="arc-modal-body" style="overflow-y:auto;max-height:75vh"></div>
+    <div id="arc-tab-bar" style="display:none;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+      <button class="fbtn active" id="arc-tab-standings" onclick="switchArcTab('standings')">📊 Standings</button>
+      <button class="fbtn" id="arc-tab-results" onclick="switchArcTab('results')">🥍 Game Results</button>
+      <input type="text" id="arc-results-search" placeholder="Filter by team…" oninput="filterArcResults()" style="display:none;flex:1;min-width:140px;max-width:240px;font-size:13px;padding:5px 10px;background:var(--navy);border:1px solid var(--border);border-radius:20px;color:var(--text)">
+    </div>
+    <div id="arc-modal-body" style="overflow-y:auto;max-height:70vh"></div>
+    <div id="arc-modal-results" style="display:none;overflow-y:auto;max-height:70vh"></div>
   </div>
 </div>
 
@@ -877,7 +883,7 @@ function loadState(){
       const migratedTeams=migrateTeams(parsed.teams||JSON.parse(JSON.stringify(DEFAULT_TEAMS)));
       TEAMS=migratedTeams;buildTM();
       const migratedGames=migrateGameIds(parsed.games||[]);
-      const st={teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:[],year:parsed.year||2026,archives:parsed.archives||[],playoffSpots:parsed.playoffSpots||{...DEFAULT_PLAYOFF_SPOTS}};
+      const st={teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:[],year:parsed.year||new Date().getFullYear(),archives:parsed.archives||[],playoffSpots:parsed.playoffSpots||{...DEFAULT_PLAYOFF_SPOTS}};
       try{localStorage.setItem(SK,JSON.stringify(st));}catch(e){}
       history.replaceState(null,'',location.pathname+location.search);
       return st;
@@ -894,7 +900,7 @@ function loadState(){
       TEAMS=[...JSON.parse(JSON.stringify(DEFAULT_TEAMS)),...customTeams];
       buildTM();
       const migratedGames=migrateGameIds(parsed.games||[]);
-      return{teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:parsed.pending||[],year:parsed.year||2026,archives:parsed.archives||[],playoffSpots:parsed.playoffSpots||{...DEFAULT_PLAYOFF_SPOTS},brackets:parsed.brackets||JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG)),messages:parsed.messages||[],playinDate:parsed.playinDate||'Tuesday, May 14, 2026',playinVenue:parsed.playinVenue||'@ Higher Seed'};
+      return{teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:parsed.pending||[],year:parsed.year||new Date().getFullYear(),archives:parsed.archives||[],playoffSpots:parsed.playoffSpots||{...DEFAULT_PLAYOFF_SPOTS},brackets:parsed.brackets||JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG)),messages:parsed.messages||[],playinDate:parsed.playinDate||'',playinVenue:parsed.playinVenue||''};
     }
   }catch(e){console.warn('v7 load:',e);}
 
@@ -905,7 +911,7 @@ function loadState(){
       const parsed=JSON.parse(old);
       TEAMS=JSON.parse(JSON.stringify(DEFAULT_TEAMS));buildTM();
       const migratedGames=migrateGameIds(parsed.games||[]);
-      const st={teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:parsed.pending||[],year:parsed.year||2026,archives:parsed.archives||[],playoffSpots:parsed.playoffSpots||{...DEFAULT_PLAYOFF_SPOTS}};
+      const st={teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:parsed.pending||[],year:parsed.year||new Date().getFullYear(),archives:parsed.archives||[],playoffSpots:parsed.playoffSpots||{...DEFAULT_PLAYOFF_SPOTS}};
       try{localStorage.setItem(SK,JSON.stringify(st));}catch(e){}
       return st;
     }
@@ -918,7 +924,7 @@ function loadState(){
       const parsed=JSON.parse(old);
       TEAMS=JSON.parse(JSON.stringify(DEFAULT_TEAMS));buildTM();
       const migratedGames=migrateGameIds(parsed.games||[]);
-      const st={teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:parsed.pending||[],year:parsed.year||2026,archives:parsed.archives||[],playoffSpots:parsed.playoffSpots||{...DEFAULT_PLAYOFF_SPOTS}};
+      const st={teams:TEAMS,games:mergeGames(makeSchedule(),migratedGames),pending:parsed.pending||[],year:parsed.year||new Date().getFullYear(),archives:parsed.archives||[],playoffSpots:parsed.playoffSpots||{...DEFAULT_PLAYOFF_SPOTS}};
       try{localStorage.setItem(SK,JSON.stringify(st));}catch(e){}
       return st;
     }
@@ -926,14 +932,14 @@ function loadState(){
 
   // Fresh start
   TEAMS=JSON.parse(JSON.stringify(DEFAULT_TEAMS));buildTM();
-  return{teams:TEAMS,games:makeSchedule(),pending:[],year:2026,archives:[],playoffSpots:{...DEFAULT_PLAYOFF_SPOTS},brackets:JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG)),messages:[]};
+  return{teams:TEAMS,games:makeSchedule(),pending:[],year:new Date().getFullYear(),archives:[],playoffSpots:{...DEFAULT_PLAYOFF_SPOTS},brackets:JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG)),messages:[]};
 }
 
 function saveState(){
   state.teams=TEAMS;
   // Ensure these fields are always on state before saving
-  if(!state.playinDate) state.playinDate='Tuesday, May 14, 2026';
-  if(!state.playinVenue) state.playinVenue='@ Higher Seed';
+  if(state.playinDate===undefined) state.playinDate='';
+  if(state.playinVenue===undefined) state.playinVenue='';
   if(!state.brackets) state.brackets=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG));
   // 1. Save locally as fallback, clear old keys
   try{
@@ -946,7 +952,7 @@ function saveState(){
       games:state.games,
       teams:TEAMS.filter(t=>!t._ph),
       pending:state.pending||[],
-      year:state.year||2026,
+      year:state.year||new Date().getFullYear(),
       archives:state.archives||[],
       playoffSpots:state.playoffSpots||DEFAULT_PLAYOFF_SPOTS,
       confRules:state.confRules||{1:'allQualify',2:'allQualify',3:'fillSpots',4:'playIn'},
@@ -956,8 +962,8 @@ function saveState(){
       standingsOverrides:state.standingsOverrides||{},
       brackets:state.brackets||{},
       messages:state.messages||[],
-      playinDate:state.playinDate||'Tuesday, May 14, 2026',
-      playinVenue:state.playinVenue||'@ Higher Seed'
+      playinDate:state.playinDate||'',
+      playinVenue:state.playinVenue||''
     }).catch(e=>console.error('Firebase save error:',e));
   }
 }
@@ -977,8 +983,8 @@ if(!state.crossoverRules)state.crossoverRules=[];
 if(!state.standingsOverrides)state.standingsOverrides={};
 if(!state.brackets)state.brackets=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG));
 if(!state.messages)state.messages=[];
-if(!state.playinDate)state.playinDate='Tuesday, May 14, 2026';
-if(!state.playinVenue)state.playinVenue='@ Higher Seed';
+if(!state.playinDate)state.playinDate='';
+if(!state.playinVenue)state.playinVenue='';
 
 // Clean up bogus archives: remove auto-archived entries that have 0 games played
 // These are created when restoring a season and should never show in the public archive list
@@ -1002,7 +1008,7 @@ function safeTM(id){return TM[id]||{name:id||'Unknown',conf:0,cls:'?',id:id};}
 
 // ── TITLE ──────────────────────────────────────────────────────────────────
 function updateTitle(){
-  const y=state.year||2026;
+  const y=state.year||new Date().getFullYear();
   document.getElementById('title-year').textContent=y;
   document.title=`Nassau County Girls Lacrosse ${y}`;
   ['arc-yr','arc-yr2'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=y;});
@@ -1925,7 +1931,7 @@ function updatePlayoffSpot(cls,val){
 }
 
 function archiveSeason(){
-  const year=state.year||2026;
+  const year=state.year||new Date().getFullYear();
   const input=document.getElementById('arc-confirm').value.trim();
   const err=document.getElementById('arc-err');err.style.display='none';
   if(input!==String(year)){err.textContent=`Type "${year}" exactly to confirm.`;err.style.display='block';return;}
@@ -1934,10 +1940,49 @@ function archiveSeason(){
   state.archives=state.archives||[];
   state.archives.unshift({year,archivedAt:Date.now(),teams:JSON.parse(JSON.stringify(TEAMS.filter(t=>!t._ph))),games:JSON.parse(JSON.stringify(played)),gamesPlayed:played.length,playoffSpots:JSON.parse(JSON.stringify(state.playoffSpots||DEFAULT_PLAYOFF_SPOTS))});
   state.year=year+1;state.pending=[];
+  state.brackets=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG));
+  state.messages=[];
+  state.playinDate='';state.playinVenue='';
+  state.standingsOverrides={};
   TEAMS=TEAMS.filter(t=>!t._ph);buildTM();state.games=makeSchedule();
-  saveState();updateTitle();renderAll();renderArcListAdmin();
+  // Clear localStorage FIRST so stale data can't be read on refresh
+  try{localStorage.removeItem(SK);}catch(e){}
+  // Write new season to Firebase synchronously, then save locally
+  if(window._fbDB){
+    const newData={
+      games:state.games,
+      teams:TEAMS.filter(t=>!t._ph),
+      pending:[],
+      year:state.year,
+      archives:state.archives,
+      playoffSpots:state.playoffSpots||DEFAULT_PLAYOFF_SPOTS,
+      confRules:state.confRules||{},
+      confNames:state.confNames||{},
+      schedFormat:state.schedFormat||{},
+      crossoverRules:state.crossoverRules||[],
+      standingsOverrides:{},
+      brackets:state.brackets,
+      messages:[],
+      playinDate:state.playinDate||'',
+      playinVenue:state.playinVenue||'',
+      _seasonStart:Date.now()
+    };
+    window._fbDB.ref('ncgl2026').set(newData)
+      .then(()=>{
+        // Now safe to write localStorage
+        try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+        showToast('✓ '+year+' archived! New '+state.year+' season is live for everyone.');
+      })
+      .catch(e=>{
+        console.error('Archive Firebase write failed:',e);
+        saveState();
+      });
+  } else {
+    saveState();
+  }
+  updateTitle();renderAll();renderArcListAdmin();
   document.getElementById('arc-confirm').value='';
-  showToast(`✓ ${year} archived! Configure the new ${year+1} season below.`);
+  showToast('✓ Archiving '+year+' season…');
   // Redirect admin to Conferences & Teams to set up the new season
   setTimeout(()=>{
     switchAdminSub('conferences',document.querySelector('.anb[onclick*="conferences"]'));
@@ -2024,10 +2069,15 @@ function restoreArchive(idx){
 }
 
 function openArcList(){
+  _arcIdx=-1;
+  document.getElementById('arc-tab-bar').style.display='none';
+  document.getElementById('arc-modal-results').style.display='none';
+  document.getElementById('arc-modal-results').innerHTML='';
+  document.getElementById('arc-modal-body').style.display='';
   // Only show real completed seasons in the public view:
   // Must have games played, year must be strictly less than the current live season year,
   // and must not be an auto-archived placeholder
-  const currentYear=state.year||2026;
+  const currentYear=state.year||new Date().getFullYear();
   const arcs=(state.archives||[]).filter(a=>
     !a._autoArchived &&
     (a.gamesPlayed||0) > 0 &&
@@ -2053,40 +2103,119 @@ function openArcList(){
 }
 
 function viewArchive(idx){
+  _arcIdx=idx;_arcTab='standings';
   const a=state.archives[idx];
-  const aT={};(a.teams||[]).forEach(t=>aT[t.id]=t);
-  const rec={};
-  (a.teams||[]).forEach(t=>{rec[t.id]={w:0,l:0,t:0,h2h:{}};(a.teams||[]).forEach(o=>{if(o.id!==t.id)rec[t.id].h2h[o.id]={w:0,l:0,t:0};});});
-  (a.games||[]).forEach(g=>{
-    const h=rec[g.home],av=rec[g.away];if(!h||!av)return;
-    if(g.homeScore>g.awayScore){h.w++;av.l++;}else if(g.awayScore>g.homeScore){av.w++;h.l++;}else{h.t++;av.t++;}
-  });
-  const confs=[...new Set((a.teams||[]).map(t=>t.conf))].sort();
-  let html=`<div style="font-size:12px;color:var(--gray);margin-bottom:12px">${a.gamesPlayed} games · ${(a.teams||[]).length} teams · ${confs.length} conferences · Archived ${new Date(a.archivedAt).toLocaleDateString()}</div>`;
-  html+=`<div style="display:grid;grid-template-columns:repeat(${Math.min(confs.length,3)},1fr);gap:11px">`;
-  confs.forEach(conf=>{
-    const ct=(a.teams||[]).filter(t=>t.conf===conf);
-    const sorted=[...ct.map(t=>t.id)].sort((x,y)=>{
-      const rx=rec[x],ry=rec[y];if(!rx||!ry)return 0;
-      const gx=rx.w+rx.l+rx.t,gy=ry.w+ry.l+ry.t;
-      return(gy>0?ry.w/gy:0)-(gx>0?rx.w/gx:0);
-    });
-    const col=cColor(conf);
-    html+=`<div style="background:var(--card2);border:1px solid var(--border);border-radius:9px;overflow:hidden">
-      <div style="padding:8px 12px;border-bottom:2px solid ${col};font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13px;text-transform:uppercase">Conf ${conf}</div>
-      <table class="stbl"><thead><tr><th>Team</th><th>W</th><th>L</th><th>%</th></tr></thead><tbody>
-      ${sorted.map((tid,i)=>{
-        const r=rec[tid],t=aT[tid];if(!r||!t)return'';
-        const g=r.w+r.l+r.t;
-        return`<tr><td><span class="rnk">${i+1}</span>${t.name}</td><td class="wc">${r.w}</td><td class="lc">${r.l}</td><td class="pct">${g>0?(r.w/g).toFixed(3).replace(/^0/,''):'.000'}</td></tr>`;
-      }).join('')}
-      </tbody></table></div>`;
-  });
-  html+='</div>';
-  document.getElementById('arc-modal-title').textContent=`📦 ${a.year} Season`;
-  document.getElementById('arc-modal-body').innerHTML=html;
+  document.getElementById('arc-modal-title').textContent='📦 '+a.year+' Season';
+  document.getElementById('arc-tab-bar').style.display='flex';
+  document.getElementById('arc-tab-standings').classList.add('active');
+  document.getElementById('arc-tab-results').classList.remove('active');
+  document.getElementById('arc-results-search').style.display='none';
+  document.getElementById('arc-results-search').value='';
+  document.getElementById('arc-modal-body').style.display='';
+  document.getElementById('arc-modal-results').style.display='none';
+  document.getElementById('arc-modal-body').innerHTML=buildArcStandings(a);
+  document.getElementById('arc-modal-results').innerHTML='';
   document.getElementById('arc-ov').classList.remove('hidden');
 }
+
+var _arcIdx=-1,_arcTab="standings";
+
+function buildArcStandings(a){
+  var aT={};
+  (a.teams||[]).forEach(function(t){aT[t.id]=t;});
+  var rec={};
+  (a.teams||[]).forEach(function(t){rec[t.id]={w:0,l:0,t:0};});
+  (a.games||[]).forEach(function(g){
+    var h=rec[g.home],av=rec[g.away];
+    if(!h||!av)return;
+    if(g.homeScore>g.awayScore){h.w++;av.l++;}
+    else if(g.awayScore>g.homeScore){av.w++;h.l++;}
+    else{h.t++;av.t++;}
+  });
+  var confs=[...new Set((a.teams||[]).map(function(t){return t.conf;}))].sort();
+  var html="<div style=\"font-size:12px;color:var(--gray);margin-bottom:12px\">"+a.gamesPlayed+" games · "+(a.teams||[]).length+" teams · Archived "+new Date(a.archivedAt).toLocaleDateString()+"</div>";
+  html+="<div style=\"display:grid;grid-template-columns:repeat("+Math.min(confs.length,3)+",1fr);gap:11px\">";
+  confs.forEach(function(conf){
+    var ct=(a.teams||[]).filter(function(t){return t.conf===conf;});
+    var sorted=ct.map(function(t){return t.id;}).sort(function(x,y){
+      var rx=rec[x],ry=rec[y];if(!rx||!ry)return 0;
+      var gx=rx.w+rx.l+rx.t,gy=ry.w+ry.l+ry.t;
+      return(gy>0?ry.w/gy:0)-(gx>0?rx.w/gx:0);
+    });
+    var col=cColor(conf);
+    html+="<div style=\"background:var(--card2);border:1px solid var(--border);border-radius:9px;overflow:hidden\">";
+    html+="<div style=\"padding:8px 12px;border-bottom:2px solid "+col+";font-weight:800;font-size:13px;text-transform:uppercase\">Conf "+conf+"</div>";
+    html+="<table class=\"stbl\"><thead><tr><th>Team</th><th>W</th><th>L</th><th>%</th></tr></thead><tbody>";
+    sorted.forEach(function(tid,i){
+      var r=rec[tid],t=aT[tid];if(!r||!t)return;
+      var g=r.w+r.l+r.t;
+      var pct=g>0?(r.w/g).toFixed(3).replace(/^0/,""):".000";
+      html+="<tr><td><span class=\"rnk\">"+(i+1)+"</span>"+t.name+"</td><td class=\"wc\">"+r.w+"</td><td class=\"lc\">"+r.l+"</td><td class=\"pct\">"+pct+"</td></tr>";
+    });
+    html+="</tbody></table></div>";
+  });
+  return html+"</div>";
+}
+
+function buildArcResults(a,filter){
+  var aT={};
+  (a.teams||[]).forEach(function(t){aT[t.id]=t;});
+  var q=(filter||"").toLowerCase().trim();
+  var games=(a.games||[]).filter(function(g){
+    if(g.homeScore==null&&g.awayScore==null)return false;
+    if(!q)return true;
+    var hn=(aT[g.home]?aT[g.home].name:"").toLowerCase();
+    var an=(aT[g.away]?aT[g.away].name:"").toLowerCase();
+    return hn.indexOf(q)>=0||an.indexOf(q)>=0;
+  });
+  if(!games.length){
+    return "<div style=\"color:var(--gray);padding:20px;text-align:center;font-style:italic\">No results"+(q?" matching &ldquo;"+q+"&rdquo;":"")+" found.</div>";
+  }
+  var byConf={};
+  games.forEach(function(g){
+    var conf=(aT[g.home]?aT[g.home].conf:null)||(aT[g.away]?aT[g.away].conf:null)||"?";
+    if(!byConf[conf])byConf[conf]=[];
+    byConf[conf].push(g);
+  });
+  var html="<div style=\"display:flex;flex-direction:column;gap:4px\">";
+  Object.keys(byConf).sort().forEach(function(conf){
+    var col=cColor(conf);
+    html+="<div style=\"font-weight:900;font-size:12px;text-transform:uppercase;letter-spacing:2px;color:"+col+";margin-top:12px;padding:0 4px\">Conference "+conf+"</div>";
+    byConf[conf].forEach(function(g){
+      var hT=aT[g.home];var aT2=aT[g.away];if(!hT||!aT2)return;
+      var hs=g.homeScore!=null?g.homeScore:"–";
+      var as=g.awayScore!=null?g.awayScore:"–";
+      var hW=g.homeScore>g.awayScore;var aW=g.awayScore>g.homeScore;
+      html+="<div style=\"display:flex;align-items:center;gap:10px;background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:8px 12px\">";
+      html+="<span style=\"font-size:13px;font-weight:"+(hW?"900":"400")+";color:"+(hW?"var(--text)":"var(--gray)")+";flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap\">"+hT.name+"</span>";
+      html+="<span style=\"font-weight:900;font-size:16px;color:var(--gold);min-width:52px;text-align:center;flex-shrink:0\">"+hs+" – "+as+"</span>";
+      html+="<span style=\"font-size:13px;font-weight:"+(aW?"900":"400")+";color:"+(aW?"var(--text)":"var(--gray)")+";flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right\">"+aT2.name+"</span>";
+      html+="</div>";
+    });
+  });
+  return html+"</div>";
+}
+
+function switchArcTab(tab){
+  _arcTab=tab;
+  var a=state.archives[_arcIdx];if(!a)return;
+  document.getElementById("arc-tab-standings").classList.toggle("active",tab==="standings");
+  document.getElementById("arc-tab-results").classList.toggle("active",tab==="results");
+  document.getElementById("arc-modal-body").style.display=tab==="standings"?"":"none";
+  document.getElementById("arc-modal-results").style.display=tab==="results"?"":"none";
+  document.getElementById("arc-results-search").style.display=tab==="results"?"":"none";
+  if(tab==="results"){
+    var q=document.getElementById("arc-results-search").value||"";
+    document.getElementById("arc-modal-results").innerHTML=buildArcResults(a,q);
+  }
+}
+
+function filterArcResults(){
+  var a=state.archives[_arcIdx];if(!a)return;
+  var q=document.getElementById("arc-results-search").value||"";
+  document.getElementById("arc-modal-results").innerHTML=buildArcResults(a,q);
+}
+
 
 function closeArcView(){document.getElementById('arc-ov').classList.add('hidden');}
 document.getElementById('arc-ov').addEventListener('click',e=>{if(e.target===document.getElementById('arc-ov'))closeArcView();});
@@ -3208,8 +3337,8 @@ function renderBracket(cls){
     if(cfg.playinMatch){
       const pi=cfg.playinMatch;
       const hasScore=pi.champScore!=null&&pi.oppScore!=null;
-      const piDate=state.playinDate||'Tuesday, May 14, 2026';
-      const piVenue=state.playinVenue||'@ Higher Seed';
+      const piDate=state.playinDate||'';
+      const piVenue=state.playinVenue||'';
       html+=`<div style="margin-top:14px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:13px 16px;font-size:12px">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
           <strong style="color:var(--gold);font-size:13px">⭐ Conf 4 Play-In Game</strong>
@@ -3327,8 +3456,8 @@ function renderBracket(cls){
   if(cfg.playinMatch){
     const pi=cfg.playinMatch;
     const hasScore=pi.champScore!=null&&pi.oppScore!=null;
-    const piDate=state.playinDate||'Tuesday, May 14, 2026';
-    const piVenue=state.playinVenue||'@ Higher Seed';
+    const piDate=state.playinDate||'';
+    const piVenue=state.playinVenue||'';
     html+=`<div style="margin-top:14px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:13px 16px;font-size:12px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
         <strong style="color:var(--gold);font-size:13px">⭐ Conf 4 Play-In Game</strong>
@@ -3359,11 +3488,11 @@ function adminPreviewBracket(cls){
 
 function downloadBracketsPDF(){
   initBrackets();
-  const year=state.year||2026;
+  const year=state.year||new Date().getFullYear();
   const clsColors={A:'#f97316',B:'#3b82f6',C:'#10b981',D:'#a855f7'};
   const clsNames={A:'Class A',B:'Class B',C:'Class C',D:'Class D'};
-  const piDate=state.playinDate||'Tuesday, May 14, 2026';
-  const piVenue=state.playinVenue||'@ Higher Seed';
+  const piDate=state.playinDate||'';
+  const piVenue=state.playinVenue||'';
 
   // Build bracket rows for each class
   function makeBracketRows(cls){
@@ -3495,10 +3624,10 @@ function renderPlayoffsTab(highlightCls){
   // Always sync slots from current standings before rendering
   // This ensures the correct teams show whether viewing as public or admin
   try{['A','B','C','D'].forEach(cls=>_autoSyncBracket(cls));}catch(e){console.warn('bracket sync:',e);}
-  const year=state.year||2026;
+  const year=state.year||new Date().getFullYear();
   const clsColors={A:'var(--cA)',B:'var(--cB)',C:'var(--cC)',D:'var(--cD)'};
-  const piDate=state.playinDate||'Tuesday, May 14, 2026';
-  const piVenue=state.playinVenue||'@ Higher Seed';
+  const piDate=state.playinDate||'';
+  const piVenue=state.playinVenue||'';
 
   let html=`<div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;text-transform:uppercase;letter-spacing:2px;color:var(--gold);margin-bottom:6px;text-align:center">Nassau County ${year} Playoff Brackets</div>`;
   html+=`<p style="text-align:center;font-size:13px;color:var(--gray);margin-bottom:24px">Playoff brackets will be published here when available.</p>`;
@@ -4108,9 +4237,9 @@ function openPlayinEdit(cls){
 
 function editPlayinInfo(){
   if(!isAdmin)return;
-  const newDate=prompt('Play-In Game Date:',state.playinDate||'Tuesday, May 14, 2026');
+  const newDate=prompt('Play-In Game Date:',state.playinDate||'');
   if(newDate===null)return;
-  const newVenue=prompt('Play-In Game Location:',state.playinVenue||'@ Higher Seed');
+  const newVenue=prompt('Play-In Game Location:',state.playinVenue||'');
   if(newVenue===null)return;
   state.playinDate=newDate.trim()||'Tuesday, May 14, 2026';
   state.playinVenue=newVenue.trim()||'@ Higher Seed';
@@ -4140,7 +4269,7 @@ function renderAll(){
 function exportCSV(type){
   const rec=computeStandings();
   const confs=[...new Set(TEAMS.map(t=>t.conf))].sort();
-  const year=state.year||2026;
+  const year=state.year||new Date().getFullYear();
   let rows=[],name='Nassau_Lacrosse';
 
   if(type==='conf'){
@@ -4427,7 +4556,14 @@ if(isFirebaseConfigured){
         buildTM();
         state.games = mergeGames(makeSchedule(), migrateGameIds(data.games||[]));
         state.pending = data.pending||[];
+        const prevYear=state.year||new Date().getFullYear();
         state.year = data.year||state.year;
+        // If Firebase has a newer season year, clear stale local game/bracket data
+        if(state.year>prevYear){
+          state.brackets=data.brackets||JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG));
+          state.standingsOverrides={};
+          try{localStorage.removeItem(SK);}catch(e){}
+        }
         const _rawArcs=data.archives||[];
         const _cleanArcs=_rawArcs.filter(a=>!(a._autoArchived&&a.gamesPlayed===0));
         state.archives = _cleanArcs;
@@ -4466,7 +4602,7 @@ if(isFirebaseConfigured){
         if(data.messages) state.messages=data.messages;
                 // Clean up any stale zero-game archives (e.g. accidental 2027 archive)
         // This removes them from Firebase so they stop appearing for everyone
-        const liveYear=state.year||2026;
+        const liveYear=state.year||new Date().getFullYear();
         const beforeClean=(state.archives||[]).length;
         state.archives=(state.archives||[]).filter(a=>
           (a.gamesPlayed||0)>0 || (a.year||0)<liveYear
