@@ -935,6 +935,7 @@ function loadState(){
   return{teams:TEAMS,games:makeSchedule(),pending:[],year:new Date().getFullYear(),archives:[],playoffSpots:{...DEFAULT_PLAYOFF_SPOTS},brackets:JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG)),messages:[]};
 }
 
+var _lastArchiveHash='';
 function saveState(){
   state.teams=TEAMS;
   // Ensure these fields are always on state before saving
@@ -953,7 +954,6 @@ function saveState(){
       teams:TEAMS.filter(t=>!t._ph),
       pending:state.pending||[],
       year:state.year||new Date().getFullYear(),
-      archives:state.archives||[],
       playoffSpots:state.playoffSpots||DEFAULT_PLAYOFF_SPOTS,
       confRules:state.confRules||{1:'allQualify',2:'allQualify',3:'fillSpots',4:'playIn'},
       confNames:state.confNames||{},
@@ -965,6 +965,12 @@ function saveState(){
       playinDate:state.playinDate||'',
       playinVenue:state.playinVenue||''
     }).catch(e=>console.error('Firebase save error:',e));
+    // Write archives separately only when they changed
+    const arcHash=JSON.stringify((state.archives||[]).map(a=>a.year+':'+a.archivedAt));
+    if(arcHash!==_lastArchiveHash){
+      _lastArchiveHash=arcHash;
+      window._fbDB.ref('ncgl2026/archives').set(state.archives||[]).catch(()=>{});
+    }
   }
 }
 
@@ -4610,10 +4616,14 @@ if(isFirebaseConfigured){
         if(state.archives.length<beforeClean) saveState(); // push cleanup to Firebase
         if(data.playinDate) state.playinDate=data.playinDate;
         if(data.playinVenue) state.playinVenue=data.playinVenue;
-        try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
         _invalidateStandingsCache();
-        renderAll();
-        setFBBanner('connected');
+        // Debounce: batch rapid Firebase updates into one render pass
+        if(window._listenerRenderTimer) clearTimeout(window._listenerRenderTimer);
+        window._listenerRenderTimer=setTimeout(function(){
+          renderAll();
+          setFBBanner('connected');
+          try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+        },150);
         // If Firebase still has stale team classes, push the corrected data back up once
         const fbJer = (data.teams||[]).find(t=>t.id==='JER');
         const fbFree = (data.teams||[]).find(t=>t.id==='FREE');
