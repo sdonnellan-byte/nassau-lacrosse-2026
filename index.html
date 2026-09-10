@@ -613,6 +613,10 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
   <!-- ARCHIVE -->
   <div class="asub" id="asub-archive">
     <div class="stitle">📦 Archive &amp; New Season</div>
+    <div id="reset-2026-btn" style="background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.4);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="flex:1;font-size:12px;color:var(--text)"><strong style="color:#818cf8">↩ Revert to 2026</strong><br><span style="color:var(--gray)">Reset the site back to the 2026 season so you can re-enter scores manually.</span></div>
+      <button class="btn btn-ol" onclick="resetTo2026()">↩ Reset to 2026</button>
+    </div>
     <div class="wbox">⚠️ <strong>Archiving saves all current standings, then resets scores for a fresh season.</strong> The year in the title advances by 1. If archived by mistake, use the <strong>🔄 Restore</strong> button below to undo it.</div>
     <div class="scard" style="max-width:480px">
       <h2>Archive <span id="arc-yr">2026</span> Season</h2>
@@ -995,7 +999,7 @@ if(!state.playinVenue)state.playinVenue='';
 // Clean up bogus archives: remove auto-archived entries that have 0 games played
 // These are created when restoring a season and should never show in the public archive list
 const _beforeClean=state.archives.length;
-state.archives=state.archives.filter(a=>!(a._autoArchived&&a.gamesPlayed===0));
+state.archives=state.archives.filter(a=>!(a._autoArchived&&a.gamesPlayed===0&&(!a.teams||a.teams.length===0)));
 if(state.archives.length!==_beforeClean){
   // Something was cleaned — save back so Firebase gets the fix too
   try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
@@ -1030,6 +1034,57 @@ function openAdminLoginModal(){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
+
+function resetTo2026(){
+  if(!isAdmin){showToast('Admin only','te');return;}
+  if(!confirm('Reset site to 2026 season?\n\nThis will:\n• Set the year back to 2026\n• Clear all 2027 data\n• Keep your 51 teams and schedule\n\nYou can then manually re-enter scores.\n\nType OK to confirm.')) return;
+  // Reset to 2026
+  state.year=2026;
+  state.games=makeSchedule();
+  state.pending=[];
+  state.archives=[];
+  state.brackets=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG));
+  state.messages=[];
+  state.standingsOverrides={};
+  // Clear localStorage first
+  try{localStorage.removeItem(SK);}catch(e){}
+  // Write to Firebase
+  if(window._fbDB){
+    window._fbDB.ref('ncgl2026').set({
+      games:state.games,
+      teams:TEAMS.filter(t=>!t._ph),
+      pending:[],
+      year:2026,
+      archives:[],
+      playoffSpots:state.playoffSpots||DEFAULT_PLAYOFF_SPOTS,
+      confRules:state.confRules||{},
+      confNames:state.confNames||{},
+      schedFormat:state.schedFormat||{},
+      crossoverRules:state.crossoverRules||[],
+      standingsOverrides:{},
+      brackets:state.brackets,
+      messages:[],
+      playinDate:'',
+      playinVenue:'',
+      _seasonStart:Date.now()
+    }).then(function(){
+      try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+      updateTitle();
+      renderAll();
+      showToast('\u2713 Site reset to 2026 season! You can now re-enter scores.');
+      // Hide the reset button
+      var btn=document.getElementById('reset-2026-btn');
+      if(btn) btn.remove();
+    }).catch(function(e){
+      console.error(e);
+      showToast('Firebase write failed','te');
+    });
+  } else {
+    saveState();
+    updateTitle();renderAll();
+    showToast('\u2713 Reset to 2026 (local only)');
+  }
+}
 function doLogin(){
   const u=document.getElementById('login-user').value.trim();
   const p=document.getElementById('login-pass').value;
@@ -2007,8 +2062,23 @@ function renderArcListAdmin(){
       <div style="display:flex;gap:7px;flex-shrink:0">
         <button class="btn btn-bl btn-sm" onclick="viewArchive(${i})">📋 View</button>
         <button class="btn btn-ok btn-sm" onclick="restoreArchive(${i})" title="Restore this season as the active live season">🔄 Restore</button>
+        <button class="btn btn-d btn-sm" onclick="deleteArchive(${i})" title="Permanently delete this archive">🗑</button>
       </div>
     </div>`).join('');
+}
+
+function deleteArchive(idx){
+  const a=state.archives[idx];
+  if(!a)return;
+  if(!confirm('Permanently delete the '+a.year+' archive? This cannot be undone.'))return;
+  state.archives.splice(idx,1);
+  if(window._fbDB){
+    window._fbDB.ref('ncgl2026/archives').set(state.archives).catch(()=>{});
+    window._fbDB.ref('ncgl2026').update({archives:state.archives}).catch(()=>{});
+  }
+  try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+  renderArcListAdmin();
+  showToast('✓ Archive deleted');
 }
 
 function restoreArchive(idx){
@@ -4606,14 +4676,7 @@ if(isFirebaseConfigured){
           }
         }
         if(data.messages) state.messages=data.messages;
-                // Clean up any stale zero-game archives (e.g. accidental 2027 archive)
-        // This removes them from Firebase so they stop appearing for everyone
-        const liveYear=state.year||new Date().getFullYear();
-        const beforeClean=(state.archives||[]).length;
-        state.archives=(state.archives||[]).filter(a=>
-          (a.gamesPlayed||0)>0 || (a.year||0)<liveYear
-        );
-        if(state.archives.length<beforeClean) saveState(); // push cleanup to Firebase
+                // No auto-cleanup of archives — admin manages them manually
         if(data.playinDate) state.playinDate=data.playinDate;
         if(data.playinVenue) state.playinVenue=data.playinVenue;
         _invalidateStandingsCache();
