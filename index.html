@@ -613,10 +613,6 @@ textarea:focus{outline:none;border-color:var(--blue-lt)}
   <!-- ARCHIVE -->
   <div class="asub" id="asub-archive">
     <div class="stitle">📦 Archive &amp; New Season</div>
-    <div id="reset-2026-btn" style="background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.4);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <div style="flex:1;font-size:12px;color:var(--text)"><strong style="color:#818cf8">↩ Revert to 2026</strong><br><span style="color:var(--gray)">Reset the site back to the 2026 season so you can re-enter scores manually.</span></div>
-      <button class="btn btn-ol" onclick="resetTo2026()">↩ Reset to 2026</button>
-    </div>
     <div class="wbox">⚠️ <strong>Archiving saves all current standings, then resets scores for a fresh season.</strong> The year in the title advances by 1. If archived by mistake, use the <strong>🔄 Restore</strong> button below to undo it.</div>
     <div class="scard" style="max-width:480px">
       <h2>Archive <span id="arc-yr">2026</span> Season</h2>
@@ -1035,56 +1031,6 @@ function openAdminLoginModal(){
 }
 
 
-function resetTo2026(){
-  if(!isAdmin){showToast('Admin only','te');return;}
-  if(!confirm('Reset site to 2026 season?\n\nThis will:\n• Set the year back to 2026\n• Clear all 2027 data\n• Keep your 51 teams and schedule\n\nYou can then manually re-enter scores.\n\nType OK to confirm.')) return;
-  // Reset to 2026
-  state.year=2026;
-  state.games=makeSchedule();
-  state.pending=[];
-  state.archives=[];
-  state.brackets=JSON.parse(JSON.stringify(DEFAULT_BRACKET_CONFIG));
-  state.messages=[];
-  state.standingsOverrides={};
-  // Clear localStorage first
-  try{localStorage.removeItem(SK);}catch(e){}
-  // Write to Firebase
-  if(window._fbDB){
-    window._fbDB.ref('ncgl2026').set({
-      games:state.games,
-      teams:TEAMS.filter(t=>!t._ph),
-      pending:[],
-      year:2026,
-      archives:[],
-      playoffSpots:state.playoffSpots||DEFAULT_PLAYOFF_SPOTS,
-      confRules:state.confRules||{},
-      confNames:state.confNames||{},
-      schedFormat:state.schedFormat||{},
-      crossoverRules:state.crossoverRules||[],
-      standingsOverrides:{},
-      brackets:state.brackets,
-      messages:[],
-      playinDate:'',
-      playinVenue:'',
-      _seasonStart:Date.now()
-    }).then(function(){
-      try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
-      updateTitle();
-      renderAll();
-      showToast('\u2713 Site reset to 2026 season! You can now re-enter scores.');
-      // Hide the reset button
-      var btn=document.getElementById('reset-2026-btn');
-      if(btn) btn.remove();
-    }).catch(function(e){
-      console.error(e);
-      showToast('Firebase write failed','te');
-    });
-  } else {
-    saveState();
-    updateTitle();renderAll();
-    showToast('\u2713 Reset to 2026 (local only)');
-  }
-}
 function doLogin(){
   const u=document.getElementById('login-user').value.trim();
   const p=document.getElementById('login-pass').value;
@@ -4244,8 +4190,37 @@ function closePoScoreModal(){
 }
 
 function savePoScore(){
-  const {cls,key,ri,mi,topName,botName}=_poModal;
+  const {cls,key,ri,mi,topName,botName,isPlayin}=_poModal;
   if(!cls)return;
+  if(isPlayin){
+    const tsv=parseInt(document.getElementById('po-top-score').value);
+    const bsv=parseInt(document.getElementById('po-bot-score').value);
+    const err=document.getElementById('po-score-err');
+    err.style.display='none';
+    if(isNaN(tsv)||isNaN(bsv)){err.textContent='Enter valid scores.';err.style.display='block';return;}
+    if(tsv===bsv){err.textContent='Scores cannot be tied.';err.style.display='block';return;}
+    if(tsv<0||bsv<0){err.textContent='Scores cannot be negative.';err.style.display='block';return;}
+    initBrackets();
+    const cfg=state.brackets[cls];
+    if(!cfg||!cfg.playinMatch){err.textContent='Play-in data missing.';err.style.display='block';return;}
+    const pi=cfg.playinMatch;
+    const winnerIsChamp=tsv>bsv;
+    const winnerName=winnerIsChamp?pi.champTeam:pi.oppTeam;
+    if(!cfg.matchResults)cfg.matchResults={};
+    cfg.matchResults['playin']={top:pi.champTeam,bot:pi.oppTeam,topScore:tsv,botScore:bsv,winner:winnerIsChamp?'top':'bot',winnerName,oppSeed:pi.oppSeed};
+    pi.champScore=tsv;pi.oppScore=bsv;pi.winnerId=winnerIsChamp?'champ':'opp';
+    _bracketSaveTime=Date.now();
+    if(window._fbDB){
+      window._fbDB.ref('ncgl2026/brackets/'+cls+'/matchResults').set(cfg.matchResults)
+        .then(()=>window._fbDB.ref('ncgl2026/brackets/'+cls+'/playinMatch').set(pi))
+        .catch(()=>saveState());
+    } else {saveState();}
+    try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+    closePoScoreModal();renderPlayoffsTab();
+    if(isAdmin&&document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active'))renderBracketAdminControls();
+    showToast('✓ '+winnerName+' advances from the Play-In!');
+    return;
+  }
   const tsv=parseInt(document.getElementById('po-top-score').value);
   const bsv=parseInt(document.getElementById('po-bot-score').value);
   const err=document.getElementById('po-score-err');
@@ -4282,8 +4257,26 @@ function savePoScore(){
 }
 
 function clearPoScore(){
-  const {cls,key,ri,mi}=_poModal;
-  if(!cls||!confirm('Clear this result and retract the bracket from this point forward?'))return;
+  const {cls,key,ri,mi,isPlayin}=_poModal;
+  if(!cls||!confirm('Clear this result?'))return;
+  if(isPlayin){
+    initBrackets();
+    const cfg=state.brackets[cls];if(!cfg)return;
+    if(cfg.matchResults)delete cfg.matchResults['playin'];
+    if(cfg.playinMatch){cfg.playinMatch.champScore=null;cfg.playinMatch.oppScore=null;cfg.playinMatch.winnerId=null;}
+    _bracketSaveTime=Date.now();
+    if(window._fbDB){
+      const u={};
+      u['ncgl2026/brackets/'+cls+'/matchResults']=cfg.matchResults||{};
+      u['ncgl2026/brackets/'+cls+'/playinMatch']=cfg.playinMatch||null;
+      window._fbDB.ref().update(u).catch(()=>saveState());
+    } else {saveState();}
+    try{localStorage.setItem(SK,JSON.stringify(state));}catch(e){}
+    closePoScoreModal();renderPlayoffsTab();
+    if(isAdmin&&document.getElementById('asub-playoffs')&&document.getElementById('asub-playoffs').classList.contains('active'))renderBracketAdminControls();
+    showToast('✓ Play-in result cleared','tw');
+    return;
+  }
   initBrackets();
   const cfg=state.brackets[cls];
   const st=cfg.matchResults[key]||{};
@@ -4307,8 +4300,24 @@ function clearPoScore(){
 
 function openPlayinEdit(cls){
   if(!isAdmin)return;
-  switchAdminSub('playoffs',document.querySelector('.anb[onclick*="playoffs"]'));
-  setTimeout(()=>{const el=document.getElementById('playin-score-'+cls);if(el) el.scrollIntoView({behavior:'smooth',block:'center'});},200);
+  initBrackets();
+  const cfg=state.brackets[cls];
+  if(!cfg||!cfg.playinMatch)return;
+  const pi=cfg.playinMatch;
+  const st=(cfg.matchResults&&cfg.matchResults['playin'])||{};
+  const hasScore=st.topScore!=null&&st.botScore!=null;
+  _poModal={cls,key:'playin',ri:-1,mi:-1,topName:pi.champTeam,botName:pi.oppTeam,isPlayin:true};
+  const clsLabel={A:'Class A',B:'Class B',C:'Class C',D:'Class D'}[cls]||'Class '+cls;
+  document.getElementById('po-score-title').textContent='🥍 '+clsLabel+' Play-In';
+  document.getElementById('po-score-round').textContent='⭐ Conf 4 Champ vs #'+pi.oppSeed+(state.playinDate?' · '+state.playinDate:'');
+  document.getElementById('po-top-lbl').textContent=pi.champTeam+' (Conf 4 Champ)';
+  document.getElementById('po-bot-lbl').textContent='#'+pi.oppSeed+' '+pi.oppTeam;
+  document.getElementById('po-score-err').style.display='none';
+  document.getElementById('po-top-score').value=hasScore?st.topScore:0;
+  document.getElementById('po-bot-score').value=hasScore?st.botScore:0;
+  document.getElementById('po-clear-btn').style.display=hasScore?'':'none';
+  document.getElementById('po-score-ov').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('po-top-score').focus(),80);
 }
 
 function editPlayinInfo(){
