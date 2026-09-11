@@ -3397,14 +3397,27 @@ function renderBracket(cls){
         r0.push([{...hSlot,score:r0st.topScore??null,winner:r0st.winner==='top'},{...lSlot,score:r0st.botScore??null,winner:r0st.winner==='bot'}]);
       });
     } else if(size===4){
-      // 1v4, 2v3
-      r0.push([slots[0]||{seed:1,team:'TBD'},slots[3]||{seed:4,team:'TBD'}]);
-      r0.push([slots[1]||{seed:2,team:'TBD'},slots[2]||{seed:3,team:'TBD'}]);
+      // 1v4, 2v3 — overlay scores from matchResults
+      const r0st0=cfg.matchResults&&cfg.matchResults['r0m0']||{};
+      const r0st1=cfg.matchResults&&cfg.matchResults['r0m1']||{};
+      const s4_0=slots[0]||{seed:1,team:'TBD'};const s4_3=slots[3]||{seed:4,team:'TBD'};
+      const s4_1=slots[1]||{seed:2,team:'TBD'};const s4_2=slots[2]||{seed:3,team:'TBD'};
+      r0.push([
+        {...s4_0,score:r0st0.topScore??null,winner:r0st0.winner==='top'},
+        {...s4_3,score:r0st0.botScore??null,winner:r0st0.winner==='bot'}
+      ]);
+      r0.push([
+        {...s4_1,score:r0st1.topScore??null,winner:r0st1.winner==='top'},
+        {...s4_2,score:r0st1.botScore??null,winner:r0st1.winner==='bot'}
+      ]);
     } else {
       // Generic fallback for other sizes
       const half=Math.ceil(size/2);
       for(let i=0;i<half;i++){
-        r0.push([slots[i]||{seed:i+1,team:'TBD'},slots[size-1-i]||{seed:size-i,team:'TBD'}]);
+        const gst=cfg.matchResults&&cfg.matchResults['r0m'+i]||{};
+        const ghi=slots[i]||{seed:i+1,team:'TBD'};
+        const glo=slots[size-1-i]||{seed:size-i,team:'TBD'};
+        r0.push([{...ghi,score:gst.topScore??null,winner:gst.winner==='top'},{...glo,score:gst.botScore??null,winner:gst.winner==='bot'}]);
       }
     }
     allRounds.push(r0);
